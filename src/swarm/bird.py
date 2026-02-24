@@ -140,7 +140,12 @@ class Bird(SwarmAgent):
         """
         dist = self.distance_to(target)
         if dist < self.attack_range:
-            return self.normal_attack_damage
+            # Aggressive behavior - increased damage when aggressive
+            damage = self.normal_attack_damage * self.attack_intensity
+            if self.aggressive:
+                damage *= 1.5  # 50% more damage when aggressive
+                self.state = "attacking"
+            return damage
         return 0
 
     def update(self, delta_time, neighbors_list, target, obstacles=None):

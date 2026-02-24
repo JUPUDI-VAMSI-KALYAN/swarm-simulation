@@ -17,6 +17,7 @@ from src.environment.environment import Environment
 from src.environment.air import AirEnvironment
 from src.environment.water import WaterEnvironment
 from src.environment.terrain import TerrainEnvironment
+from src.intelligence.communication import CommunicationSystem
 
 
 class Simulation:
@@ -36,6 +37,9 @@ class Simulation:
         self.paused = False
         self.total_damage_dealt = 0
         self.targets_destroyed = 0
+
+        # Communication system
+        self.communication = CommunicationSystem()
 
         # Environment management
         self.current_environment_type = "air"
@@ -65,12 +69,23 @@ class Simulation:
     def place_target(self, position):
         """
         Place a target at the given position.
+        Broadcasts to nearest swarm member, then swarm communicates.
 
         Args:
             position: Vector2D position
         """
         target = Target(position=position, health=100)
         self.targets.append(target)
+
+        # Find nearest agent and tell it
+        all_agents = self.swarm_controller.get_all_agents()
+        if all_agents:
+            nearest_agent = min(all_agents, key=lambda a: a.position.distance(position))
+            # Set target on nearest agent (first scout)
+            nearest_agent.target = target
+            nearest_agent.aggressive = True
+            nearest_agent.attack_priority = 10
+            nearest_agent.state = "attacking"
 
     def place_obstacle(self, position):
         """
@@ -122,6 +137,10 @@ class Simulation:
 
         # Update swarms
         self.swarm_controller.update_swarms(delta_time, self.targets, self.obstacles)
+
+        # Propagate target information through swarm
+        all_agents = self.swarm_controller.get_all_agents()
+        self.communication.propagate_target_info(all_agents, 120)  # Communication radius 120
 
         # Update targets
         for target in self.targets:

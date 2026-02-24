@@ -30,10 +30,16 @@ class SwarmAgent(Entity):
         # State machine
         self.state = "idle"  # idle, seeking, attacking, returning
 
+        # Aggressive behavior
+        self.aggressive = False
+        self.attack_priority = 0  # 0-10, higher = more aggressive
+        self.attack_intensity = 1.0  # Multiplier for attack damage
+
         # Messaging
         self.messages = []
         self.last_message_time = 0
         self.message_cooldown = 0.1
+        self.target_position = None  # Store heard target position
 
     def sense_environment(self, all_entities, targets_list):
         """
