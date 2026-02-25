@@ -270,8 +270,44 @@ class Simulation:
             if "clicked_button" in button_action:
                 button_name = button_action["clicked_button"]
 
-                # Swarm type buttons
-                if button_name in ["bird", "fish", "ant"]:
+                # Swarm cycling
+                if button_name == "swarm_cycle_next":
+                    swarm_types = ["bird", "fish", "ant"]
+                    current = self.swarm_controller.active_swarm_type
+                    next_idx = (swarm_types.index(current) + 1) % len(swarm_types)
+                    next_swarm = swarm_types[next_idx]
+                    if not self.swarm_controller.swarms[next_swarm]:
+                        self.spawn_swarm(next_swarm, 50)
+                    else:
+                        self.swarm_controller.active_swarm_type = next_swarm
+                    self.ui_manager.set_active_button(next_swarm)
+
+                elif button_name == "swarm_cycle_prev":
+                    swarm_types = ["bird", "fish", "ant"]
+                    current = self.swarm_controller.active_swarm_type
+                    prev_idx = (swarm_types.index(current) - 1) % len(swarm_types)
+                    prev_swarm = swarm_types[prev_idx]
+                    if not self.swarm_controller.swarms[prev_swarm]:
+                        self.spawn_swarm(prev_swarm, 50)
+                    else:
+                        self.swarm_controller.active_swarm_type = prev_swarm
+                    self.ui_manager.set_active_button(prev_swarm)
+
+                # Environment cycling
+                elif button_name == "env_cycle_next":
+                    envs = ["air", "water", "ground"]
+                    current_env = self.current_environment_type
+                    next_idx = (envs.index(current_env) + 1) % len(envs)
+                    self.switch_environment(envs[next_idx])
+
+                elif button_name == "env_cycle_prev":
+                    envs = ["air", "water", "ground"]
+                    current_env = self.current_environment_type
+                    prev_idx = (envs.index(current_env) - 1) % len(envs)
+                    self.switch_environment(envs[prev_idx])
+
+                # Direct swarm type buttons (fallback)
+                elif button_name in ["bird", "fish", "ant"]:
                     swarm_type = button_name
                     if not self.swarm_controller.swarms[swarm_type]:
                         self.spawn_swarm(swarm_type, 50)
@@ -279,7 +315,7 @@ class Simulation:
                         self.swarm_controller.active_swarm_type = swarm_type
                         self.ui_manager.set_active_button(swarm_type)
 
-                # Environment buttons
+                # Environment buttons (fallback)
                 elif button_name in ["ground", "water", "air"]:
                     self.switch_environment(button_name)
 

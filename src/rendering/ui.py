@@ -79,19 +79,21 @@ class UIManager:
 
     def create_buttons(self):
         """Create all UI buttons."""
-        # Swarm type buttons (top left)
-        self.buttons["bird"] = Button(Vector2D(50, 30), 50, 30, "BIRD", COLOR_BIRD)
-        self.buttons["fish"] = Button(Vector2D(120, 30), 50, 30, "FISH", COLOR_FISH)
-        self.buttons["ant"] = Button(Vector2D(190, 30), 50, 30, "ANT", COLOR_ANT)
+        # Active swarm display with switcher (top left)
+        self.buttons["swarm_label"] = Button(Vector2D(40, 15), 70, 20, "SWARM:", (50, 50, 50), COLOR_WHITE)
+        self.buttons["swarm_display"] = Button(Vector2D(40, 35), 70, 25, "BIRD", COLOR_BIRD)
+        self.buttons["swarm_prev"] = Button(Vector2D(15, 35), 25, 25, "◄")
+        self.buttons["swarm_next"] = Button(Vector2D(65, 35), 25, 25, "►")
 
-        # Environment buttons (top middle)
-        self.buttons["ground"] = Button(Vector2D(280, 30), 60, 30, "GROUND", COLOR_GROUND)
-        self.buttons["water"] = Button(Vector2D(360, 30), 50, 30, "WATER", COLOR_WATER)
-        self.buttons["air"] = Button(Vector2D(420, 30), 40, 30, "AIR", COLOR_AIR)
+        # Active environment display with switcher (top middle)
+        self.buttons["env_label"] = Button(Vector2D(180, 15), 70, 20, "ENV:", (50, 50, 50), COLOR_WHITE)
+        self.buttons["env_display"] = Button(Vector2D(180, 35), 70, 25, "AIR", COLOR_AIR)
+        self.buttons["env_prev"] = Button(Vector2D(155, 35), 25, 25, "◄")
+        self.buttons["env_next"] = Button(Vector2D(205, 35), 25, 25, "►")
 
         # Control buttons (top right)
-        self.buttons["spawn"] = Button(Vector2D(SCREEN_WIDTH - 150, 30), 80, 30, "SPAWN x50")
-        self.buttons["pause"] = Button(Vector2D(SCREEN_WIDTH - 60, 30), 50, 30, "PAUSE")
+        self.buttons["spawn"] = Button(Vector2D(SCREEN_WIDTH - 120, 30), 80, 30, "SPAWN x50")
+        self.buttons["pause"] = Button(Vector2D(SCREEN_WIDTH - 30, 30), 50, 30, "PAUSE")
 
     def update(self, mouse_pos):
         """Update UI state."""
@@ -101,7 +103,7 @@ class UIManager:
 
     def handle_click(self, mouse_pos):
         """
-        Handle button clicks.
+        Handle button clicks including environment/swarm switching.
 
         Args:
             mouse_pos: Mouse position (Vector2D)
@@ -113,15 +115,35 @@ class UIManager:
 
         for button_name, button in self.buttons.items():
             if button.is_clicked(mouse_pos):
-                action["clicked_button"] = button_name
+                # Handle switcher arrows
+                if button_name == "swarm_next":
+                    action["clicked_button"] = "swarm_cycle_next"
+                elif button_name == "swarm_prev":
+                    action["clicked_button"] = "swarm_cycle_prev"
+                elif button_name == "env_next":
+                    action["clicked_button"] = "env_cycle_next"
+                elif button_name == "env_prev":
+                    action["clicked_button"] = "env_cycle_prev"
+                else:
+                    action["clicked_button"] = button_name
                 return action
 
         return action
 
     def set_active_button(self, button_name):
-        """Set a button as active (highlighted)."""
-        for name, button in self.buttons.items():
-            button.active = (name == button_name)
+        """Update active swarm type or environment display."""
+        if button_name in ["bird", "fish", "ant"]:
+            # Update swarm display
+            label_map = {"bird": "BIRD", "fish": "FISH", "ant": "ANT"}
+            color_map = {"bird": COLOR_BIRD, "fish": COLOR_FISH, "ant": COLOR_ANT}
+            self.buttons["swarm_display"].label = label_map[button_name]
+            self.buttons["swarm_display"].color = color_map[button_name]
+        elif button_name in ["air", "water", "ground"]:
+            # Update environment display
+            label_map = {"air": "AIR", "water": "WATER", "ground": "GROUND"}
+            color_map = {"air": COLOR_AIR, "water": COLOR_WATER, "ground": COLOR_GROUND}
+            self.buttons["env_display"].label = label_map[button_name]
+            self.buttons["env_display"].color = color_map[button_name]
 
     def draw(self, renderer):
         """Draw all UI elements."""
