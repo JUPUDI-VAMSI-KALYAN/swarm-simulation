@@ -141,7 +141,7 @@ class Ant(SwarmAgent):
             return self.normal_attack_damage
         return 0
 
-    def update(self, delta_time, target, neighbors_list):
+    def update(self, delta_time, target, neighbors_list, targets_list=None):
         """
         Update ant state and physics.
 
@@ -149,7 +149,12 @@ class Ant(SwarmAgent):
             delta_time: Time since last update
             target: Current target (if any)
             neighbors_list: List of neighbor ants
+            targets_list: List of all targets (for message processing)
         """
+        # Process incoming messages from swarm communication
+        if targets_list:
+            self.process_messages(targets_list)
+
         # Deposit pheromone as we move
         target_found = target is not None and target.alive
         self.deposit_pheromone(target_found)

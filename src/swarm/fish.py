@@ -141,7 +141,7 @@ class Fish(SwarmAgent):
             return self.normal_attack_damage
         return 0
 
-    def update(self, delta_time, neighbors_list, target, attacking=False):
+    def update(self, delta_time, neighbors_list, target, targets_list=None, attacking=False):
         """
         Update fish state and physics.
 
@@ -149,12 +149,17 @@ class Fish(SwarmAgent):
             delta_time: Time since last update
             neighbors_list: List of neighbor fish
             target: Current target (if any)
+            targets_list: List of all targets (for message processing)
             attacking: Whether fish is in wave attack mode
         """
+        # Process incoming messages from swarm communication
+        if targets_list:
+            self.process_messages(targets_list)
+
         self.in_wave_attack = attacking
 
         # Vote for targets
-        all_targets = [target] if target else []
+        all_targets = targets_list if targets_list else ([target] if target else [])
         self.vote_for_target(all_targets, neighbors_list)
 
         # Calculate steering

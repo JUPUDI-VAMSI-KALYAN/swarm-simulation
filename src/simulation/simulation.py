@@ -144,13 +144,14 @@ class Simulation:
 
             # Agent has a target - broadcast to neighbors only (O(1) per agent via pre-computed neighbor list)
             if agent.neighbors:
-                # Create target found message
+                # Create target found message with both position and reference
                 message = Message(
                     msg_type=MessageType.TARGET_FOUND,
                     sender_id=agent.id,
                     position=agent.position,
                     target_pos=agent.target.position if agent.target else None,
-                    priority=max(7, agent.attack_priority)
+                    priority=max(7, agent.attack_priority),
+                    target=agent.target  # Pass actual target reference
                 )
 
                 # Broadcast only to neighbors within communication radius (already computed in sense_environment)

@@ -152,7 +152,7 @@ class Bird(SwarmAgent):
             return damage
         return 0
 
-    def update(self, delta_time, neighbors_list, target, obstacles=None):
+    def update(self, delta_time, neighbors_list, target, targets_list=None, obstacles=None):
         """
         Update bird state and physics.
 
@@ -160,10 +160,11 @@ class Bird(SwarmAgent):
             delta_time: Time since last update
             neighbors_list: List of neighbor birds
             target: Current target (if any)
+            targets_list: List of all targets (for message processing)
             obstacles: List of obstacles for avoidance
         """
-        # Process incoming messages from swarm communication
-        self.process_messages()
+        # Process incoming messages from swarm communication with targets list
+        self.process_messages(targets_list)
 
         # Update dive state
         self.update_dive_attack(delta_time)

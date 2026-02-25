@@ -16,7 +16,7 @@ class MessageType(Enum):
 class Message:
     """Communication message between swarm members."""
 
-    def __init__(self, msg_type, sender_id, position, target_pos=None, priority=1):
+    def __init__(self, msg_type, sender_id, position, target_pos=None, priority=1, target=None):
         """
         Create a message.
 
@@ -26,6 +26,7 @@ class Message:
             position: Position of sender
             target_pos: Target position (if relevant)
             priority: Message priority (1-10, higher = more important)
+            target: Target entity reference (for passing actual object)
         """
         self.msg_type = msg_type
         self.sender_id = sender_id
@@ -33,6 +34,7 @@ class Message:
         self.target_pos = target_pos
         self.priority = priority
         self.hops = 0  # Track message propagation
+        self.target = target  # Actual target entity reference
 
 
 class CommunicationSystem:

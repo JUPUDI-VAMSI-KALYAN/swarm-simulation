@@ -23,7 +23,7 @@ class SwarmController:
         }
         self.active_swarm_type = "bird"
         self.neighbor_update_counter = 0
-        self.neighbor_update_frequency = 5  # Update neighbors every N frames
+        self.neighbor_update_frequency = 1  # Update neighbors every frame for responsive communication
 
         # Pheromone map for ants
         self.pheromone_map = PheromoneMap()
@@ -156,13 +156,8 @@ class SwarmController:
 
         # Update each bird
         for bird in alive_birds:
-            # Get target
-            if bird.target is None and targets_list:
-                bird.target = random.choice([t for t in targets_list if t.alive])
-
-            # Update bird
             neighbors = bird.neighbors if bird.neighbors else []
-            bird.update(delta_time, neighbors, bird.target)
+            bird.update(delta_time, neighbors, bird.target, targets_list)
 
             # Attack if in range
             if bird.target and bird.target.alive:
@@ -218,7 +213,7 @@ class SwarmController:
         # Update each fish
         for fish in alive_fish:
             neighbors = fish.neighbors if fish.neighbors else []
-            fish.update(delta_time, neighbors, fish.target, attacking=self.fish_wave_active)
+            fish.update(delta_time, neighbors, fish.target, targets_list, attacking=self.fish_wave_active)
 
             # Attack if in range
             if fish.target and fish.target.alive:
@@ -244,7 +239,7 @@ class SwarmController:
         # Update each ant
         for ant in alive_ants:
             neighbors = ant.neighbors if ant.neighbors else []
-            ant.update(delta_time, ant.target, neighbors)
+            ant.update(delta_time, ant.target, neighbors, targets_list)
 
             # Attack if in range
             if ant.target and ant.target.alive:

@@ -154,13 +154,24 @@ class SwarmAgent(Entity):
             # Message types: target_found, target_location, under_attack, target_destroyed, attack_now
             if 'target' in msg_type_str.lower() or 'location' in msg_type_str.lower():
                 # Adopt the target from the message
-                if hasattr(message, 'target_pos'):
+                if hasattr(message, 'target_pos') and targets_list:
                     self.target_position = message.target_pos
-                    # If we don't have a target but received a target location, become aggressive
-                    if self.target is None and message.target_pos:
+                    # Find actual target by position (may be sent as reference in Message)
+                    if hasattr(message, 'target') and message.target:
+                        self.target = message.target
+                    else:
+                        # Search for target at position
+                        for t in targets_list:
+                            if t.alive and t.position.distance(message.target_pos) < 10:
+                                self.target = t
+                                break
+
+                    # If we got target, become aggressive and set timeout
+                    if self.target is not None:
                         self.aggressive = True
+                        self.aggressive_timeout = 25  # Stay aggressive for 25 seconds
                         self.attack_priority = 8
-                        self.state = "seeking"
+                        self.state = "attacking"  # Go straight to attacking to broadcast message
 
             # Handle ATTACK_NOW messages - increase aggression
             elif 'attack' in msg_type_str.lower():
