@@ -32,9 +32,40 @@ class SwarmController:
         self.fish_wave_target = None
         self.fish_wave_active = False
 
+    def _create_grid_positions(self, center, count, spacing=60):
+        """
+        Create grid positions for agents to spread out.
+
+        Args:
+            center: Center position (Vector2D)
+            count: Number of positions to create
+            spacing: Distance between grid points
+
+        Returns:
+            List of Vector2D positions
+        """
+        positions = []
+        grid_size = int((count ** 0.5) + 1)  # sqrt(count) x sqrt(count) grid
+
+        for i in range(count):
+            row = i // grid_size
+            col = i % grid_size
+
+            # Calculate grid position relative to center
+            x = center.x + (col - grid_size / 2) * spacing
+            y = center.y + (row - grid_size / 2) * spacing
+
+            # Clamp to screen bounds
+            x = max(10, min(SCREEN_WIDTH - 10, x))
+            y = max(10, min(SCREEN_HEIGHT - 10, y))
+
+            positions.append(Vector2D(x, y))
+
+        return positions
+
     def spawn_swarm(self, swarm_type, count, position, environment=None):
         """
-        Spawn a new swarm of agents.
+        Spawn a new swarm of agents in a grid pattern for spreading.
 
         Args:
             swarm_type: Type of swarm ("bird", "fish", "ant")
@@ -47,6 +78,9 @@ class SwarmController:
         """
         spawned = []
 
+        # Generate grid positions for spreading
+        grid_positions = self._create_grid_positions(position, count, spacing=60)
+
         if swarm_type == "bird":
             flock_behavior = FlockingBehavior(
                 cohesion_weight=0.3,
@@ -54,16 +88,8 @@ class SwarmController:
                 alignment_weight=0.4
             )
 
-            for _ in range(count):
-                offset = Vector2D(
-                    random.uniform(-30, 30),
-                    random.uniform(-30, 30)
-                )
-                pos = position + offset
-                pos.x = max(10, min(SCREEN_WIDTH - 10, pos.x))
-                pos.y = max(10, min(SCREEN_HEIGHT - 10, pos.y))
-
-                bird = Bird(position=pos, flock_behavior=flock_behavior)
+            for idx, grid_pos in enumerate(grid_positions):
+                bird = Bird(position=grid_pos, flock_behavior=flock_behavior)
                 self.swarms["bird"].append(bird)
                 spawned.append(bird)
 
@@ -74,30 +100,14 @@ class SwarmController:
                 alignment_weight=0.35
             )
 
-            for _ in range(count):
-                offset = Vector2D(
-                    random.uniform(-40, 40),
-                    random.uniform(-40, 40)
-                )
-                pos = position + offset
-                pos.x = max(10, min(SCREEN_WIDTH - 10, pos.x))
-                pos.y = max(10, min(SCREEN_HEIGHT - 10, pos.y))
-
-                fish = Fish(position=pos, schooling_behavior=schooling_behavior)
+            for idx, grid_pos in enumerate(grid_positions):
+                fish = Fish(position=grid_pos, schooling_behavior=schooling_behavior)
                 self.swarms["fish"].append(fish)
                 spawned.append(fish)
 
         elif swarm_type == "ant":
-            for _ in range(count):
-                offset = Vector2D(
-                    random.uniform(-30, 30),
-                    random.uniform(-30, 30)
-                )
-                pos = position + offset
-                pos.x = max(10, min(SCREEN_WIDTH - 10, pos.x))
-                pos.y = max(10, min(SCREEN_HEIGHT - 10, pos.y))
-
-                ant = Ant(position=pos, pheromone_map=self.pheromone_map)
+            for idx, grid_pos in enumerate(grid_positions):
+                ant = Ant(position=grid_pos, pheromone_map=self.pheromone_map)
                 self.swarms["ant"].append(ant)
                 spawned.append(ant)
 
