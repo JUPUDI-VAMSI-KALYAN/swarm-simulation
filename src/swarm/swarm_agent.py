@@ -41,6 +41,10 @@ class SwarmAgent(Entity):
         self.message_cooldown = 0.1
         self.target_position = None  # Store heard target position
 
+        # State management
+        self.state_timer = 0  # Track how long in current state
+        self.aggressive_timeout = 0  # How long to stay aggressive
+
     def sense_environment(self, all_entities, targets_list):
         """
         Detect nearby entities (neighbors) and targets.
@@ -118,25 +122,88 @@ class SwarmAgent(Entity):
             self.messages = []
         self.messages.append(message)
 
-    def receive_message(self, message, sender):
+    def receive_message(self, message):
         """
-        Receive and process a message from another agent.
+        Queue a message for processing.
 
         Args:
-            message: Message dict
-            sender: The agent sending the message
+            message: Message object or dict
         """
         if self.messages is None:
             self.messages = []
-        self.messages.append({"type": "received", "data": message, "sender": sender})
+        self.messages.append(message)
+
+    def process_messages(self, targets_list=None):
+        """
+        Process queued messages and update agent state.
+        This is the critical integration point for swarm communication.
+
+        Args:
+            targets_list: List of targets (for resolving target positions)
+        """
+        if not self.messages:
+            return
+
+        for message in self.messages[:]:  # Copy list to avoid modification during iteration
+            # Handle TARGET_FOUND messages
+            if hasattr(message, 'msg_type'):
+                msg_type_str = message.msg_type.value if hasattr(message.msg_type, 'value') else str(message.msg_type)
+            else:
+                msg_type_str = message.get('type', '')
+
+            # Message types: target_found, target_location, under_attack, target_destroyed, attack_now
+            if 'target' in msg_type_str.lower() or 'location' in msg_type_str.lower():
+                # Adopt the target from the message
+                if hasattr(message, 'target_pos'):
+                    self.target_position = message.target_pos
+                    # If we don't have a target but received a target location, become aggressive
+                    if self.target is None and message.target_pos:
+                        self.aggressive = True
+                        self.attack_priority = 8
+                        self.state = "seeking"
+
+            # Handle ATTACK_NOW messages - increase aggression
+            elif 'attack' in msg_type_str.lower():
+                self.aggressive = True
+                self.attack_priority = max(self.attack_priority, 9)
+                self.state = "attacking"
+
+            # Remove processed message
+            self.messages.remove(message)
+
+    def broadcast_to_neighbors(self, neighbors_list, message):
+        """
+        Broadcast a message to neighboring agents.
+
+        Args:
+            neighbors_list: List of (neighbor, distance) tuples
+            message: Message to broadcast
+        """
+        for neighbor, _ in neighbors_list:
+            if neighbor.alive:
+                neighbor.receive_message(message)
 
     def update_energy(self, delta_time):
         """
-        Update energy over time.
+        Update energy over time and manage state transitions.
 
         Args:
             delta_time: Time since last update
         """
+        # Update state timers
+        self.state_timer += delta_time
+
+        # Manage aggressive timeout
+        if self.aggressive_timeout > 0:
+            self.aggressive_timeout -= delta_time
+        else:
+            # Timeout aggressive state if no target
+            if self.aggressive and self.target is None:
+                self.aggressive = False
+                self.attack_priority = 0
+                self.state = "idle"
+                self.state_timer = 0
+
         # Energy decays based on speed
         speed = self.velocity.magnitude()
         energy_drain = speed * delta_time * 5

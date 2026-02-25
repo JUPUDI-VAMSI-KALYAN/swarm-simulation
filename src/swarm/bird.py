@@ -124,7 +124,11 @@ class Bird(SwarmAgent):
         if dist < target.radius + self.radius:
             self.is_diving = False
             self.state = "idle"
-            return self.max_dive_damage
+            # Apply aggressive damage multiplier to dive attacks too
+            dive_damage = self.max_dive_damage * self.attack_intensity
+            if self.aggressive:
+                dive_damage *= 1.3  # 30% damage boost when aggressive
+            return dive_damage
 
         return 0
 
@@ -158,6 +162,9 @@ class Bird(SwarmAgent):
             target: Current target (if any)
             obstacles: List of obstacles for avoidance
         """
+        # Process incoming messages from swarm communication
+        self.process_messages()
+
         # Update dive state
         self.update_dive_attack(delta_time)
 
@@ -172,7 +179,7 @@ class Bird(SwarmAgent):
         from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
         self.wrap_edges(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-        # Update energy
+        # Update energy and manage state timeouts
         self.update_energy(delta_time)
 
         # Manage state transitions

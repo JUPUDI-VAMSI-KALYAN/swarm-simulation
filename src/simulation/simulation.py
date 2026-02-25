@@ -69,7 +69,7 @@ class Simulation:
     def place_target(self, position):
         """
         Place a target at the given position.
-        Broadcasts to nearest swarm member, then swarm communicates.
+        Sets nearest agent as scout, which broadcasts to swarm.
 
         Args:
             position: Vector2D position
@@ -77,13 +77,14 @@ class Simulation:
         target = Target(position=position, health=100)
         self.targets.append(target)
 
-        # Find nearest agent and tell it
+        # Find nearest agent and tell it first (scout discovery)
         all_agents = self.swarm_controller.get_all_agents()
         if all_agents:
             nearest_agent = min(all_agents, key=lambda a: a.position.distance(position))
-            # Set target on nearest agent (first scout)
+            # Set target on nearest agent (first scout discovers target)
             nearest_agent.target = target
             nearest_agent.aggressive = True
+            nearest_agent.aggressive_timeout = 30  # Stay aggressive for 30 seconds
             nearest_agent.attack_priority = 10
             nearest_agent.state = "attacking"
 
@@ -127,6 +128,34 @@ class Simulation:
                 if not self.swarm_controller.swarms["ant"]:
                     self.spawn_swarm("ant", 50)
 
+    def _broadcast_swarm_messages(self, all_agents):
+        """
+        Broadcast target information through swarm using neighbor communication.
+        This replaces O(n²) propagation with neighbor-based message passing.
+
+        Args:
+            all_agents: List of all agents in simulation
+        """
+        from src.intelligence.communication import Message, MessageType
+
+        for agent in all_agents:
+            if not agent.alive or agent.target is None:
+                continue
+
+            # Agent has a target - broadcast to neighbors only (O(1) per agent via pre-computed neighbor list)
+            if agent.neighbors:
+                # Create target found message
+                message = Message(
+                    msg_type=MessageType.TARGET_FOUND,
+                    sender_id=agent.id,
+                    position=agent.position,
+                    target_pos=agent.target.position if agent.target else None,
+                    priority=max(7, agent.attack_priority)
+                )
+
+                # Broadcast only to neighbors within communication radius (already computed in sense_environment)
+                agent.broadcast_to_neighbors(agent.neighbors, message)
+
     def update(self, delta_time):
         """Update simulation state."""
         if self.paused:
@@ -138,9 +167,10 @@ class Simulation:
         # Update swarms
         self.swarm_controller.update_swarms(delta_time, self.targets, self.obstacles)
 
-        # Propagate target information through swarm
+        # Broadcast target information through swarm communication
+        # Each agent tells nearby agents about its target (neighbor-based, not O(n²))
         all_agents = self.swarm_controller.get_all_agents()
-        self.communication.propagate_target_info(all_agents, 120)  # Communication radius 120
+        self._broadcast_swarm_messages(all_agents)
 
         # Update targets
         for target in self.targets:
