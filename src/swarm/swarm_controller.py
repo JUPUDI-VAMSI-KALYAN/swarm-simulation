@@ -8,7 +8,7 @@ from src.intelligence.tactical_formation import TacticalFormationBehavior
 from src.intelligence.sonar_sweeps import SonarSweepBehavior
 from src.intelligence.signal_network import SignalNetworkMap
 from src.core.vector2d import Vector2D
-from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
+from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT, SwarmConfig, NEIGHBOR_UPDATE_INTERVAL
 
 
 class SwarmController:
@@ -113,7 +113,7 @@ class SwarmController:
 
         self.neighbor_update_timer += delta_time
         should_update_neighbors = False
-        if self.neighbor_update_timer >= 0.1: # Update neighbors at 10Hz
+        if self.neighbor_update_timer >= NEIGHBOR_UPDATE_INTERVAL:
             should_update_neighbors = True
             self.neighbor_update_timer = 0
 
@@ -149,7 +149,7 @@ class SwarmController:
                 dist = drone.distance_to(drone.target)
 
                 # Decide to kamikaze strike or normal payload
-                if drone.can_strike() and dist < 250 and random.random() < 0.02:  # 2% chance per frame
+                if drone.can_strike() and dist < SwarmConfig.DRONE_STRIKE_RANGE and random.random() < 0.02:
                     drone.initiate_strike(drone.target)
 
                 # Perform attacks
@@ -190,7 +190,7 @@ class SwarmController:
         # Check if barrage should start
         if votes and len(alive_pods) > 0:
             max_votes = max(votes.values())
-            if max_votes / len(alive_pods) >= 0.6:
+            if max_votes / len(alive_pods) >= SwarmConfig.POD_BARRAGE_VOTE_THRESHOLD:
                 barrage_target = [t for t, v in votes.items() if v == max_votes][0]
 
         self.pod_barrage_target = barrage_target

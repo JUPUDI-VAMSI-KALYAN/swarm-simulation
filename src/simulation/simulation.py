@@ -4,7 +4,7 @@ import pygame
 import random
 from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BLACK, COLOR_DRONE, COLOR_TARGET,
-    COLOR_WHITE, COLOR_GROUND, COLOR_WATER, COLOR_AIR
+    COLOR_WHITE, COLOR_GROUND, COLOR_WATER, COLOR_AIR, SwarmConfig
 )
 from src.core.vector2d import Vector2D
 from src.rendering.renderer import Renderer
@@ -84,7 +84,7 @@ class Simulation:
             # Set target on nearest agent (first scout discovers target)
             nearest_agent.target = target
             nearest_agent.aggressive = True
-            nearest_agent.aggressive_timeout = 30  # Stay aggressive for 30 seconds
+            nearest_agent.aggressive_timeout = SwarmConfig.DEFAULT_AGGRESSIVE_TIMEOUT
             nearest_agent.attack_priority = 10
             nearest_agent.state = "attacking"
 
