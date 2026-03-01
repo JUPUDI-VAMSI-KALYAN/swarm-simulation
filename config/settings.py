@@ -36,6 +36,13 @@ COLOR_GROUND = (25, 30, 25)      # Dark Olive / Ground
 COLOR_WATER = (10, 25, 45)       # Deep Navy / Water
 COLOR_AIR = (20, 25, 35)         # Dark Air / Night Sky
 
+# Map colors
+COLOR_MAP_LAND = (40, 50, 40)     # Dark green land
+COLOR_MAP_WATER = (10, 30, 60)    # Deep blue ocean
+COLOR_MAP_BORDER = (100, 120, 100) # Border outline
+COLOR_MAP_CITY = (255, 80, 80)    # City marker
+COLOR_MAP_PORT = (255, 150, 50)   # Port marker
+
 
 # Swarm Configuration
 class SwarmConfig:
