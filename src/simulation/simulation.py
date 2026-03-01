@@ -17,7 +17,7 @@ from src.environment.environment import Environment
 from src.environment.air import AirEnvironment
 from src.environment.water import WaterEnvironment
 from src.environment.terrain import TerrainEnvironment
-from src.environment.map_renderer import MapManager
+from src.environment.osm_map import OSMMapManager
 from src.intelligence.communication import CommunicationSystem
 
 
@@ -51,8 +51,8 @@ class Simulation:
         }
         self.current_environment = self.environments["air"]
 
-        # Geographic maps
-        self.map_manager = MapManager(SCREEN_WIDTH, SCREEN_HEIGHT)
+        # Geographic maps (OpenStreetMap)
+        self.map_manager = OSMMapManager(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.show_map = True
         self.map_type = "india"  # "india" or "indian_ocean"
 
@@ -119,9 +119,11 @@ class Simulation:
 
             # Map follows environment: air -> India, water -> Indian Ocean, ground -> India
             if env_type == "water":
-                self.map_manager.set_map("indian_ocean")
+                self.map_manager.indian_ocean_renderer.set_region("indian_ocean")
+                self.map_type = "indian_ocean"
             else:
-                self.map_manager.set_map("india")
+                self.map_manager.india_renderer.set_region("india")
+                self.map_type = "india"
 
             # Clear incompatible swarms and set active button
             if env_type == "air":
@@ -203,8 +205,8 @@ class Simulation:
         
         # Render geographic map if enabled
         if self.show_map:
-            self.map_manager.render(self.renderer.screen)
-            self.map_manager.render_overlays(self.renderer.screen, self.renderer.font_small)
+            renderer = self.map_manager.get_renderer(self.map_type)
+            renderer.render(self.renderer.screen)
         else:
             self.renderer.screen.fill(self.current_environment.color)
 
