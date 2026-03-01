@@ -1,6 +1,7 @@
 """Steering behaviors for swarm agents."""
 
 import math
+from typing import Any
 from src.core.vector2d import Vector2D
 
 
@@ -87,7 +88,12 @@ class SteeringBehaviors:
         return steering
 
     @staticmethod
-    def separation(position, neighbors, perception_radius=80, max_force=1.0):
+    def separation(
+        position: Vector2D,
+        neighbors: list[tuple[Any, float]],
+        perception_radius: float = 80.0,
+        max_force: float = 1.0
+    ) -> Vector2D:
         """
         Separation behavior - avoid crowding neighbors.
 

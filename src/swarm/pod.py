@@ -1,16 +1,22 @@
 """Pod swarm implementation with sonar search and torpedo barrage attacks."""
 
 import random
+from typing import Any, Optional
+
 from src.swarm.swarm_agent import SwarmAgent
 from src.intelligence.sonar_sweeps import SonarSweepBehavior
 from src.core.vector2d import Vector2D
-from config.settings import COLOR_POD
+from config.settings import COLOR_POD, SwarmConfig
 
 
 class Pod(SwarmAgent):
     """Intelligent unmanned underwater vehicle (Pod) that sweeps with sonar and performs torpedo barrages."""
 
-    def __init__(self, position=None, sweep_behavior=None):
+    def __init__(
+        self,
+        position: Optional[Vector2D] = None,
+        sweep_behavior: Optional[SonarSweepBehavior] = None
+    ) -> None:
         """
         Initialize a pod.
 
@@ -18,33 +24,36 @@ class Pod(SwarmAgent):
             position: Starting position (Vector2D)
             sweep_behavior: SonarSweepBehavior instance
         """
-        super().__init__(position=position, swarm_type="pod", radius=5)
+        super().__init__(position=position, swarm_type="pod", radius=SwarmConfig.POD_RADIUS)
 
-        # Pod-specific parameters, slightly slower due to water resistance
-        self.max_speed = 180.0
-        self.max_force = 100.0
-        self.perception_radius = 350.0
-        self.communication_radius = 500.0
+        self.max_speed = SwarmConfig.POD_MAX_SPEED
+        self.max_force = SwarmConfig.POD_MAX_FORCE
+        self.perception_radius = SwarmConfig.POD_PERCEPTION_RADIUS
+        self.communication_radius = SwarmConfig.POD_COMMUNICATION_RADIUS
 
         self.sweep_behavior = sweep_behavior or SonarSweepBehavior()
-        self.sweep_angle = random.uniform(0, 6.28) # Initialize sweep angle
+        self.sweep_angle = random.uniform(0, 6.28)
 
-        # Torpedo barrage mechanics
-        self.barrage_vote = None  # What target this pod wants to attack
+        self.barrage_vote: Optional[Any] = None
         self.in_barrage_attack = False
-        self.attack_cooldown = 0
-        self.normal_attack_damage = 25.0 # Normal damage per second
-        self.barrage_attack_damage = 80.0 # Barrage damage per second
-        self.attack_range = 250.0 # Torpedo standoff distance
+        self.attack_cooldown = 0.0
+        self.normal_attack_damage = SwarmConfig.POD_NORMAL_ATTACK_DAMAGE
+        self.barrage_attack_damage = SwarmConfig.POD_BARRAGE_ATTACK_DAMAGE
+        self.attack_range = SwarmConfig.POD_ATTACK_RANGE
 
         self.color = COLOR_POD
 
-    def calculate_steering_force(self, neighbors_list, target, max_force=None):
+    def calculate_steering_force(
+        self,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        max_force: Optional[float] = None
+    ) -> Vector2D:
         """
         Calculate steering force based on sonar sweep and target seeking.
 
         Args:
-            neighbors_list: List of (neighbor, distance) tuples
+            neighbors: List of (neighbor, distance) tuples
             target: Current target (if any)
             max_force: Maximum force magnitude (uses self.max_force if None)
 
@@ -54,22 +63,18 @@ class Pod(SwarmAgent):
         if max_force is None:
             max_force = self.max_force
 
-        # Use sonar sweep behavior
         steering, self.sweep_angle = self.sweep_behavior.calculate_sweep_steering(
-            self, self.sweep_angle, neighbors_list, self.perception_radius, max_force
+            self, self.sweep_angle, neighbors, self.perception_radius, max_force
         )
 
-        # Add target seeking if one is assigned
         if target and target.alive:
-            # Prioritize seeking over sweeping when a target is found
             target_dist = self.distance_to(target)
             if target_dist > 0:
-                # Overpower the sweep behavior when engaging
                 return (self.get_direction_to(target) * max_force * 2.0).limit(max_force)
 
         return steering.limit(max_force)
 
-    def vote_for_target(self, targets_list, neighbors_list):
+    def vote_for_target(self, targets_list: list[Any], neighbors_list: list[tuple[Any, float]]) -> None:
         """
         Vote for which target the fleet should attack via torpedo barrage.
 
@@ -148,29 +153,33 @@ class Pod(SwarmAgent):
             return self.normal_attack_damage
         return 0
 
-    def update(self, delta_time, neighbors_list, target, targets_list=None, attacking=False):
+    def update(
+        self,
+        delta_time: float,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        targets_list: Optional[list[Any]] = None,
+        attacking: bool = False
+    ) -> None:
         """
         Update pod state and physics.
 
         Args:
             delta_time: Time since last update
-            neighbors_list: List of neighbor pods
+            neighbors: List of neighbor pods
             target: Current target (if any)
             targets_list: List of all targets (for message processing)
             attacking: Whether pod is in torpedo barrage mode
         """
-        # Process incoming messages from swarm communication
         if targets_list:
             self.process_messages(targets_list)
 
         self.in_barrage_attack = attacking
 
-        # Vote for targets via underwater acoustics
         all_targets = targets_list if targets_list else ([target] if target else [])
-        self.vote_for_target(all_targets, neighbors_list)
+        self.vote_for_target(all_targets, neighbors)
 
-        # Calculate steering
-        steering = self.calculate_steering_force(neighbors_list, self.target)
+        steering = self.calculate_steering_force(neighbors, self.target)
         self.apply_force(steering)
 
         # Parent update

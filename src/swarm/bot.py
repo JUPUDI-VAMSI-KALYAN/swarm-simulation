@@ -1,17 +1,22 @@
 """Bot swarm implementation with digital signal network communication."""
 
 import random
-import math
+from typing import Any, Optional
+
 from src.swarm.swarm_agent import SwarmAgent
 from src.intelligence.behaviors import SteeringBehaviors
 from src.core.vector2d import Vector2D
-from config.settings import COLOR_BOT
+from config.settings import COLOR_BOT, SwarmConfig
 
 
 class Bot(SwarmAgent):
     """Intelligent terrestrial bot that uses digital signals (mesh network) for communication."""
 
-    def __init__(self, position=None, signal_map=None):
+    def __init__(
+        self,
+        position: Optional[Vector2D] = None,
+        signal_map: Any = None
+    ) -> None:
         """
         Initialize a terrestrial bot.
 
@@ -19,32 +24,32 @@ class Bot(SwarmAgent):
             position: Starting position (Vector2D)
             signal_map: SignalNetworkMap instance
         """
-        super().__init__(position=position, swarm_type="bot", radius=4)
+        super().__init__(position=position, swarm_type="bot", radius=SwarmConfig.BOT_RADIUS)
 
-        # Bot-specific parameters (ground traversal)
-        self.max_speed = 150.0
-        self.max_force = 80.0
-        self.perception_radius = 250.0
-        self.communication_radius = 400.0
+        self.max_speed = SwarmConfig.BOT_MAX_SPEED
+        self.max_force = SwarmConfig.BOT_MAX_FORCE
+        self.perception_radius = SwarmConfig.BOT_PERCEPTION_RADIUS
+        self.communication_radius = SwarmConfig.BOT_COMMUNICATION_RADIUS
 
         self.signal_map = signal_map
 
-        # Bot behavior states
         self.carrying_payload = False
-        self.signal_trail = []
-        self.attack_range = 150.0 # Standard engagement range
-        self.normal_attack_damage = 15.0 # Damage per second (kinetic/electronic)
-        self.random_walk_strength = 0.4
+        self.signal_trail: list[Any] = []
+        self.attack_range = SwarmConfig.BOT_ATTACK_RANGE
+        self.normal_attack_damage = SwarmConfig.BOT_NORMAL_ATTACK_DAMAGE
+        self.random_walk_strength = SwarmConfig.BOT_RANDOM_WALK_STRENGTH
         
-        # Precision patrol state
         self.patrol_timer = random.randint(10, 60)
-        self.patrol_state = random.randint(0, 3) # N/E/S/W
-
-        self.attack_range = 10
+        self.patrol_state = random.randint(0, 3)
 
         self.color = COLOR_BOT
 
-    def calculate_steering_force(self, target, neighbors_list, max_force=None):
+    def calculate_steering_force(
+        self,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        max_force: Optional[float] = None
+    ) -> Vector2D:
         """
         Calculate steering force based on signal grid and target.
 
@@ -82,7 +87,7 @@ class Bot(SwarmAgent):
         
         # 4. Light separation to not crowd completely
         sep = SteeringBehaviors.separation(
-            self.position, neighbors_list, self.perception_radius * 0.4, max_force
+            self.position, neighbors, self.perception_radius * 0.4, max_force
         )
         forces.append(sep * 0.5)
 
@@ -130,38 +135,38 @@ class Bot(SwarmAgent):
 
         dist = self.distance_to(target)
         actual_dist = max(0, dist - target.radius - self.radius)
-        print(f"[DEBUG] Bot Actual Dist: {actual_dist} (Attack Range: {self.attack_range})")
         if actual_dist < self.attack_range:
-            print("[DEBUG] Bot hitting target!")
             return self.normal_attack_damage
         return 0
 
-    def update(self, delta_time, target, neighbors_list, targets_list=None):
+    def update(
+        self,
+        delta_time: float,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        targets_list: Optional[list[Any]] = None
+    ) -> None:
         """
         Update bot state and physics.
 
         Args:
             delta_time: Time since last update
+            neighbors: List of neighbor bots
             target: Current target (if any)
-            neighbors_list: List of neighbor bots
             targets_list: List of all targets (for message processing)
         """
-        # Process incoming messages from swarm communication
         if targets_list:
             self.process_messages(targets_list)
 
-        # Emit mesh networking signal
-        target_found = target is not None and target.alive
+        target_found = target is not None and getattr(target, 'alive', False)
         self.emit_digital_signal(target_found)
 
-        # Engage with target when close
         if target and target.alive:
             actual_dist = max(0, self.distance_to(target) - getattr(target, 'radius', 15) - self.radius)
             if actual_dist < 15:
                 self.pick_up_payload(target)
 
-        # Calculate steering
-        steering = self.calculate_steering_force(target, neighbors_list)
+        steering = self.calculate_steering_force(neighbors, target)
         self.apply_force(steering)
 
         # Parent update

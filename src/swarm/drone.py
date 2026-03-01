@@ -1,17 +1,26 @@
 """Drone swarm implementation with tactical formation and strike behaviors."""
 
-import random
+import logging
 import math
+import random
+from typing import Any, Optional
+
 from src.swarm.swarm_agent import SwarmAgent
 from src.intelligence.tactical_formation import TacticalFormationBehavior
 from src.core.vector2d import Vector2D
-from config.settings import COLOR_DRONE
+from config.settings import COLOR_DRONE, SwarmConfig
+
+logger = logging.getLogger(__name__)
 
 
 class Drone(SwarmAgent):
     """Intelligent combat drone that aligns in formation and coordinates payload strikes."""
 
-    def __init__(self, position=None, formation_behavior=None):
+    def __init__(
+        self,
+        position: Optional[Vector2D] = None,
+        formation_behavior: Optional[TacticalFormationBehavior] = None
+    ) -> None:
         """
         Initialize a drone.
 
@@ -19,31 +28,32 @@ class Drone(SwarmAgent):
             position: Starting position (Vector2D)
             formation_behavior: TacticalFormationBehavior instance
         """
-        super().__init__(position=position, swarm_type="drone", radius=6)
+        super().__init__(position=position, swarm_type="drone", radius=SwarmConfig.DRONE_RADIUS)
 
-        # Drone-specific parameters (high speed aerial)
-        self.max_speed = 350.0
-        self.max_force = 180.0
-        self.perception_radius = 450.0
-        self.communication_radius = 600.0
+        self.max_speed = SwarmConfig.DRONE_MAX_SPEED
+        self.max_force = SwarmConfig.DRONE_MAX_FORCE
+        self.perception_radius = SwarmConfig.DRONE_PERCEPTION_RADIUS
+        self.communication_radius = SwarmConfig.DRONE_COMMUNICATION_RADIUS
 
         self.formation_behavior = formation_behavior or TacticalFormationBehavior()
 
-        # Strike attack mechanics
-        self.altitude = 100  # Simulated height above target
-        self.strike_cooldown = 0
+        self.altitude = SwarmConfig.DRONE_ALTITUDE
+        self.strike_cooldown = 0.0
         self.is_striking = False
         self.strike_target = None
-        self.max_strike_damage = 4.0
+        self.max_strike_damage = SwarmConfig.DRONE_MAX_STRIKE_DAMAGE
 
-        # Attack parameters
-        self.normal_attack_damage = 1.0
-        self.attack_range = 15
+        self.normal_attack_damage = SwarmConfig.DRONE_NORMAL_ATTACK_DAMAGE
+        self.attack_range = SwarmConfig.DRONE_ATTACK_RANGE
 
-        # Color for rendering
         self.color = COLOR_DRONE
 
-    def calculate_steering_force(self, neighbors_list, target, max_force=None):
+    def calculate_steering_force(
+        self,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        max_force: Optional[float] = None
+    ) -> Vector2D:
         """
         Calculate steering force based on tactical formation and target seeking.
 
@@ -60,14 +70,12 @@ class Drone(SwarmAgent):
 
         # Use tactical grid formation behavior
         steering = self.formation_behavior.update_formation_member(
-            self, neighbors_list, target,
+            self, neighbors, target,
             self.perception_radius, max_force
         )
 
-        import math
         if math.isnan(steering.x) or math.isnan(steering.y):
-            # Fallback to zero if bad math occurs
-            print(f"[DEBUG] Drone {self.id} generated NaN steering force!")
+            logger.warning(f"Drone {self.id} generated NaN steering force, using fallback")
             return Vector2D(0, 0)
 
         return steering
@@ -157,13 +165,20 @@ class Drone(SwarmAgent):
             return damage
         return 0
 
-    def update(self, delta_time, neighbors_list, target, targets_list=None, obstacles=None):
+    def update(
+        self,
+        delta_time: float,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        targets_list: Optional[list[Any]] = None,
+        obstacles: Optional[list[Any]] = None
+    ) -> None:
         """
         Update drone state and physics.
 
         Args:
             delta_time: Time since last update
-            neighbors_list: List of neighbor drones
+            neighbors: List of neighbor drones
             target: Current target (if any)
             targets_list: List of all targets (for message processing)
             obstacles: List of obstacles for avoidance
@@ -175,7 +190,7 @@ class Drone(SwarmAgent):
         self.update_strike_attack(delta_time)
 
         # Calculate steering
-        steering = self.calculate_steering_force(neighbors_list, target)
+        steering = self.calculate_steering_force(neighbors, target)
         self.apply_force(steering)
 
         import math

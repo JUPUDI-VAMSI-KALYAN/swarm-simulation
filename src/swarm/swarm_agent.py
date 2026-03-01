@@ -1,13 +1,20 @@
 """Base SwarmAgent class for all swarm members."""
 
+from typing import Any, Optional
 from src.core.entity import Entity
 from src.core.vector2d import Vector2D
+from config.settings import SwarmConfig
 
 
 class SwarmAgent(Entity):
     """Base class for all swarm members."""
 
-    def __init__(self, position=None, swarm_type="generic", radius=5.0):
+    def __init__(
+        self,
+        position: Optional[Vector2D] = None,
+        swarm_type: str = "generic",
+        radius: float = 5.0
+    ) -> None:
         """
         Initialize a swarm agent.
 
@@ -19,33 +26,33 @@ class SwarmAgent(Entity):
         super().__init__(position=position, radius=radius)
 
         self.swarm_type = swarm_type
-        self.perception_radius = 80.0
-        self.communication_radius = 120.0
+        self.perception_radius = SwarmConfig.DEFAULT_PERCEPTION_RADIUS
+        self.communication_radius = SwarmConfig.DEFAULT_COMMUNICATION_RADIUS
 
-        self.target = None
-        self.neighbors = []
-        self.energy = 100.0
-        self.max_energy = 100.0
+        self.target: Optional[Any] = None
+        self.neighbors: list[tuple[Any, float]] = []
+        self.energy = SwarmConfig.DEFAULT_MAX_ENERGY
+        self.max_energy = SwarmConfig.DEFAULT_MAX_ENERGY
 
-        # State machine
-        self.state = "idle"  # idle, seeking, attacking, returning
+        self.state: str = "idle"
 
-        # Aggressive behavior
         self.aggressive = False
-        self.attack_priority = 0  # 0-10, higher = more aggressive
-        self.attack_intensity = 1.0  # Multiplier for attack damage
+        self.attack_priority = 0
+        self.attack_intensity = 1.0
 
-        # Messaging
-        self.messages = []
-        self.last_message_time = 0
-        self.message_cooldown = 0.1
-        self.target_position = None  # Store heard target position
+        self.messages: list[Any] = []
+        self.last_message_time = 0.0
+        self.message_cooldown = SwarmConfig.DEFAULT_MESSAGE_COOLDOWN
+        self.target_position: Optional[Vector2D] = None
 
-        # State management
-        self.state_timer = 0  # Track how long in current state
-        self.aggressive_timeout = 0  # How long to stay aggressive
+        self.state_timer = 0.0
+        self.aggressive_timeout = 0.0
 
-    def sense_environment(self, all_entities, targets_list):
+    def sense_environment(
+        self,
+        all_entities: list[Any],
+        targets_list: list[Any]
+    ) -> None:
         """
         Detect nearby entities (neighbors) and targets.
 
@@ -53,6 +60,8 @@ class SwarmAgent(Entity):
             all_entities: List of all entities in simulation
             targets_list: List of targets to detect
         """
+        if not all_entities:
+            return
         # Clear old neighbors and find new ones
         self.neighbors = []
         for entity in all_entities:
@@ -98,13 +107,20 @@ class SwarmAgent(Entity):
 
         return best_target
 
-    def calculate_steering_force(self, environment=None):
+    def calculate_steering_force(
+        self,
+        neighbors: list[tuple[Any, float]],
+        target: Optional[Any],
+        max_force: Optional[float] = None
+    ) -> Vector2D:
         """
         Calculate the steering force based on behaviors.
         Subclasses override this for specific swarm behaviors.
 
         Args:
-            environment: Environment object (for wind/currents)
+            neighbors: List of (neighbor_entity, distance) tuples
+            target: Current target entity (if any)
+            max_force: Maximum force magnitude
 
         Returns:
             Vector2D steering force

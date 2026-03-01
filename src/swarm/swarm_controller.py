@@ -227,7 +227,7 @@ class SwarmController:
         # Update each bot
         for bot in alive_bots:
             neighbors = bot.neighbors if bot.neighbors else []
-            bot.update(delta_time, bot.target, neighbors, targets_list)
+            bot.update(delta_time, neighbors, bot.target, targets_list)
 
             # Attack if in range
             if bot.target and bot.target.alive:
