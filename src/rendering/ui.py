@@ -1,19 +1,19 @@
-"""UI components for the simulation."""
+"""UI components for the tactical simulation."""
 
 import pygame
 from src.core.vector2d import Vector2D
 from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_WHITE, COLOR_BLACK,
-    COLOR_BIRD, COLOR_FISH, COLOR_ANT, COLOR_GROUND, COLOR_WATER, COLOR_AIR
+    COLOR_DRONE, COLOR_POD, COLOR_BOT, COLOR_GROUND, COLOR_WATER, COLOR_AIR
 )
 
 
 class Button:
-    """Clickable button UI element."""
+    """Clickable button UI element for tactical HUD."""
 
-    def __init__(self, position, width, height, label, color=(100, 100, 100), text_color=COLOR_WHITE):
+    def __init__(self, position, width, height, label, color=(30, 40, 50), text_color=COLOR_WHITE):
         """
-        Initialize a button.
+        Initialize a HUD button.
 
         Args:
             position: Vector2D position
@@ -52,24 +52,27 @@ class Button:
         self.hovered = self.get_rect().collidepoint(int(mouse_pos.x), int(mouse_pos.y))
 
     def draw(self, renderer):
-        """Draw button."""
+        """Draw tactical button."""
         current_color = self.hover_color if self.hovered else self.color
         if self.active:
-            current_color = (0, 200, 0)
+            current_color = (0, 150, 0)  # Active tactical green
 
         rect = self.get_rect()
-        pygame.draw.rect(renderer.screen, current_color, rect)
-        pygame.draw.rect(renderer.screen, COLOR_BLACK, rect, 2)
+        pygame.draw.rect(renderer.screen, current_color, rect, border_radius=6)
+        
+        # Draw stroke
+        stroke_color = COLOR_WHITE if self.hovered else (100, 110, 120)
+        pygame.draw.rect(renderer.screen, stroke_color, rect, 2, border_radius=6)
 
         # Draw text
-        font = renderer.font_small
+        font = renderer.font_medium
         text_surface = font.render(self.label, True, self.text_color)
         text_rect = text_surface.get_rect(center=rect.center)
         renderer.screen.blit(text_surface, text_rect)
 
 
 class UIManager:
-    """Manages all UI elements."""
+    """Manages all HUD UI elements."""
 
     def __init__(self):
         """Initialize UI manager."""
@@ -78,22 +81,22 @@ class UIManager:
         self.mouse_pos = Vector2D(0, 0)
 
     def create_buttons(self):
-        """Create all UI buttons."""
+        """Create all HUD buttons."""
         # Active swarm display with switcher (top left)
-        self.buttons["swarm_label"] = Button(Vector2D(40, 15), 70, 20, "SWARM:", (50, 50, 50), COLOR_WHITE)
-        self.buttons["swarm_display"] = Button(Vector2D(40, 35), 70, 25, "BIRD", COLOR_BIRD)
-        self.buttons["swarm_prev"] = Button(Vector2D(15, 35), 25, 25, "◄")
-        self.buttons["swarm_next"] = Button(Vector2D(65, 35), 25, 25, "►")
+        self.buttons["swarm_label"] = Button(Vector2D(45, 15), 80, 20, "UNIT:", (20, 25, 30), COLOR_WHITE)
+        self.buttons["swarm_display"] = Button(Vector2D(45, 35), 80, 25, "DRONE", COLOR_DRONE, COLOR_BLACK)
+        self.buttons["swarm_prev"] = Button(Vector2D(15, 35), 25, 25, "◄", (20, 25, 30))
+        self.buttons["swarm_next"] = Button(Vector2D(75, 35), 25, 25, "►", (20, 25, 30))
 
         # Active environment display with switcher (top middle)
-        self.buttons["env_label"] = Button(Vector2D(180, 15), 70, 20, "ENV:", (50, 50, 50), COLOR_WHITE)
-        self.buttons["env_display"] = Button(Vector2D(180, 35), 70, 25, "AIR", COLOR_AIR)
-        self.buttons["env_prev"] = Button(Vector2D(155, 35), 25, 25, "◄")
-        self.buttons["env_next"] = Button(Vector2D(205, 35), 25, 25, "►")
+        self.buttons["env_label"] = Button(Vector2D(190, 15), 80, 20, "ZONE:", (20, 25, 30), COLOR_WHITE)
+        self.buttons["env_display"] = Button(Vector2D(190, 35), 80, 25, "AIR", COLOR_AIR, COLOR_WHITE)
+        self.buttons["env_prev"] = Button(Vector2D(160, 35), 25, 25, "◄", (20, 25, 30))
+        self.buttons["env_next"] = Button(Vector2D(220, 35), 25, 25, "►", (20, 25, 30))
 
         # Control buttons (top right)
-        self.buttons["spawn"] = Button(Vector2D(SCREEN_WIDTH - 120, 30), 80, 30, "SPAWN x50")
-        self.buttons["pause"] = Button(Vector2D(SCREEN_WIDTH - 30, 30), 50, 30, "PAUSE")
+        self.buttons["spawn"] = Button(Vector2D(SCREEN_WIDTH - 130, 30), 100, 30, "DEPLOY x50", (30, 40, 50))
+        self.buttons["pause"] = Button(Vector2D(SCREEN_WIDTH - 40, 30), 60, 30, "HOLD", (30, 40, 50))
 
     def update(self, mouse_pos):
         """Update UI state."""
@@ -132,12 +135,13 @@ class UIManager:
 
     def set_active_button(self, button_name):
         """Update active swarm type or environment display."""
-        if button_name in ["bird", "fish", "ant"]:
+        if button_name in ["drone", "pod", "bot"]:
             # Update swarm display
-            label_map = {"bird": "BIRD", "fish": "FISH", "ant": "ANT"}
-            color_map = {"bird": COLOR_BIRD, "fish": COLOR_FISH, "ant": COLOR_ANT}
+            label_map = {"drone": "DRONE", "pod": "POD", "bot": "BOT"}
+            color_map = {"drone": COLOR_DRONE, "pod": COLOR_POD, "bot": COLOR_BOT}
             self.buttons["swarm_display"].label = label_map[button_name]
             self.buttons["swarm_display"].color = color_map[button_name]
+            self.buttons["swarm_display"].text_color = COLOR_BLACK
         elif button_name in ["air", "water", "ground"]:
             # Update environment display
             label_map = {"air": "AIR", "water": "WATER", "ground": "GROUND"}
@@ -146,22 +150,32 @@ class UIManager:
             self.buttons["env_display"].color = color_map[button_name]
 
     def draw(self, renderer):
-        """Draw all UI elements."""
+        """Draw all HUD elements."""
+        # Top translucent control bar
+        hud_bar = pygame.Surface((SCREEN_WIDTH, 60), pygame.SRCALPHA)
+        hud_bar.fill((15, 20, 25, 200)) # Tactical dark navy with alpha
+        renderer.screen.blit(hud_bar, (0, 0))
+        
+        # Bottom translucent stats bar
+        stat_bar = pygame.Surface((SCREEN_WIDTH, 60), pygame.SRCALPHA)
+        stat_bar.fill((15, 20, 25, 200)) 
+        renderer.screen.blit(stat_bar, (0, SCREEN_HEIGHT - 60))
+
         for button in self.buttons.values():
             button.draw(renderer)
 
     def draw_stats(self, renderer, stats):
-        """Draw simulation statistics."""
+        """Draw tactical telemetry on the HUD."""
         stats_text = (
-            f"Birds: {stats.get('bird_count', 0)} | "
-            f"Fish: {stats.get('fish_count', 0)} | "
-            f"Ants: {stats.get('ant_count', 0)} | "
-            f"Targets: {stats.get('targets_alive', 0)} | "
-            f"Destroyed: {stats.get('targets_destroyed', 0)}"
+            f"AIR: {stats.get('drone_count', 0):03d} | "
+            f"SUB: {stats.get('pod_count', 0):03d} | "
+            f"GND: {stats.get('bot_count', 0):03d} | "
+            f"HOSTILES: {stats.get('targets_alive', 0):02d} | "
+            f"CLEARED: {stats.get('targets_destroyed', 0):03d}"
         )
-        renderer.draw_text(stats_text, (10, SCREEN_HEIGHT - 25), COLOR_BLACK, "small")
+        renderer.draw_text(stats_text, (20, SCREEN_HEIGHT - 40), COLOR_WHITE, "medium")
 
     def draw_help(self, renderer):
-        """Draw help text."""
-        help_text = "Left Click: Place Target | Right Click: Place Obstacle | R: Reset"
-        renderer.draw_text(help_text, (10, SCREEN_HEIGHT - 50), COLOR_BLACK, "small")
+        """Draw help text for command input."""
+        help_text = "[L-CLK] DESIGNATE HOSTILE  |  [R-CLK] DEPLOY BARRICADE"
+        renderer.draw_text(help_text, (SCREEN_WIDTH - 600, SCREEN_HEIGHT - 40), (150, 160, 170), "medium")

@@ -6,7 +6,8 @@ Main entry point for the application.
 """
 
 import sys
-sys.path.insert(0, '/Users/jupudivamsikalyan/IOBI')
+import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.simulation.simulation import Simulation
 

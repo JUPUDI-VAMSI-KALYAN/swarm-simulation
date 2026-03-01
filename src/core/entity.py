@@ -26,8 +26,8 @@ class Entity:
         self.acceleration = Vector2D(0, 0)
 
         self.radius = radius
-        self.max_speed = 5.0
-        self.max_force = 1.0
+        self.max_speed = 300.0  # Increased for delta_time physics scale
+        self.max_force = 100.0
 
         self.alive = True
         self.creation_time = 0

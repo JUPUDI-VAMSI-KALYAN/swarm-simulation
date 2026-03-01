@@ -1,36 +1,35 @@
-"""SwarmController manages all swarms and their coordination."""
+"""SwarmController manages all tactical swarms and their coordination."""
 
 import random
-from src.swarm.bird import Bird
-from src.swarm.fish import Fish
-from src.swarm.ant import Ant
-from src.intelligence.flocking import FlockingBehavior
-from src.intelligence.schooling import SchoolingBehavior
-from src.intelligence.pheromone import PheromoneMap
+from src.swarm.drone import Drone
+from src.swarm.pod import Pod
+from src.swarm.bot import Bot
+from src.intelligence.tactical_formation import TacticalFormationBehavior
+from src.intelligence.sonar_sweeps import SonarSweepBehavior
+from src.intelligence.signal_network import SignalNetworkMap
 from src.core.vector2d import Vector2D
 from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
 
 
 class SwarmController:
-    """Manages all swarms and coordinates their behavior."""
+    """Manages all tactical swarms (Drones, Pods, Bots) and coordinates their behavior."""
 
     def __init__(self):
         """Initialize the swarm controller."""
         self.swarms = {
-            "bird": [],
-            "fish": [],
-            "ant": []
+            "drone": [],
+            "pod": [],
+            "bot": []
         }
-        self.active_swarm_type = "bird"
-        self.neighbor_update_counter = 0
-        self.neighbor_update_frequency = 1  # Update neighbors every frame for responsive communication
+        self.active_swarm_type = "drone"
+        self.neighbor_update_timer = 0 # Track time for 10Hz sensing updates
 
-        # Pheromone map for ants
-        self.pheromone_map = PheromoneMap()
+        # Digital signal map for bots
+        self.signal_map = SignalNetworkMap()
 
-        # Wave attack state
-        self.fish_wave_target = None
-        self.fish_wave_active = False
+        # Torpedo barrage state
+        self.pod_barrage_target = None
+        self.pod_barrage_active = False
 
     def _create_grid_positions(self, center, count, spacing=60):
         """
@@ -65,10 +64,10 @@ class SwarmController:
 
     def spawn_swarm(self, swarm_type, count, position, environment=None):
         """
-        Spawn a new swarm of agents in a grid pattern for spreading.
+        Spawn a new swarm of tactical agents in a grid pattern.
 
         Args:
-            swarm_type: Type of swarm ("bird", "fish", "ant")
+            swarm_type: Type of swarm ("drone", "pod", "bot")
             count: Number of agents to spawn
             position: Center position for spawning (Vector2D)
             environment: Environment object
@@ -81,188 +80,178 @@ class SwarmController:
         # Generate grid positions for spreading
         grid_positions = self._create_grid_positions(position, count, spacing=60)
 
-        if swarm_type == "bird":
-            flock_behavior = FlockingBehavior(
-                cohesion_weight=0.3,
-                separation_weight=0.3,
-                alignment_weight=0.4
-            )
+        if swarm_type == "drone":
+            formation_behavior = TacticalFormationBehavior()
 
             for idx, grid_pos in enumerate(grid_positions):
-                bird = Bird(position=grid_pos, flock_behavior=flock_behavior)
-                self.swarms["bird"].append(bird)
-                spawned.append(bird)
+                drone = Drone(position=grid_pos, formation_behavior=formation_behavior)
+                self.swarms["drone"].append(drone)
+                spawned.append(drone)
 
-        elif swarm_type == "fish":
-            schooling_behavior = SchoolingBehavior(
-                cohesion_weight=0.25,
-                separation_weight=0.4,
-                alignment_weight=0.35
-            )
+        elif swarm_type == "pod":
+            sweep_behavior = SonarSweepBehavior()
 
             for idx, grid_pos in enumerate(grid_positions):
-                fish = Fish(position=grid_pos, schooling_behavior=schooling_behavior)
-                self.swarms["fish"].append(fish)
-                spawned.append(fish)
+                pod = Pod(position=grid_pos, sweep_behavior=sweep_behavior)
+                self.swarms["pod"].append(pod)
+                spawned.append(pod)
 
-        elif swarm_type == "ant":
+        elif swarm_type == "bot":
             for idx, grid_pos in enumerate(grid_positions):
-                ant = Ant(position=grid_pos, pheromone_map=self.pheromone_map)
-                self.swarms["ant"].append(ant)
-                spawned.append(ant)
+                bot = Bot(position=grid_pos, signal_map=self.signal_map)
+                self.swarms["bot"].append(bot)
+                spawned.append(bot)
 
         return spawned
 
-    def update_swarms(self, delta_time, targets_list, obstacles_list=None):
+    def update_swarms(self, delta_time, targets, obstacles):
         """
-        Update all active swarms.
-
-        Args:
-            delta_time: Time since last update
-            targets_list: List of target entities
-            obstacles_list: List of obstacles
+        Main update loop for all swarms.
         """
-        # Update pheromone map
-        self.pheromone_map.update()
+        # Update signal network map
+        self.signal_map.update()
 
-        # Update neighbor cache periodically
-        self.neighbor_update_counter += 1
-        should_update_neighbors = (self.neighbor_update_counter % self.neighbor_update_frequency) == 0
+        self.neighbor_update_timer += delta_time
+        should_update_neighbors = False
+        if self.neighbor_update_timer >= 0.1: # Update neighbors at 10Hz
+            should_update_neighbors = True
+            self.neighbor_update_timer = 0
 
-        # Update each swarm type
-        self._update_bird_swarm(delta_time, targets_list, should_update_neighbors)
-        self._update_fish_swarm(delta_time, targets_list, should_update_neighbors)
-        self._update_ant_swarm(delta_time, targets_list, should_update_neighbors)
+        # Gather all agents for neighbor sensing across types
+        all_agents = self.get_all_agents()
 
-    def _update_bird_swarm(self, delta_time, targets_list, should_update_neighbors):
-        """
-        Update all birds in the swarm.
+        # Update each sub-swarm
+        self._update_drone_swarm(delta_time, targets, should_update_neighbors, all_agents)
+        self._update_pod_swarm(delta_time, targets, should_update_neighbors, all_agents)
+        self._update_bot_swarm(delta_time, targets, should_update_neighbors, all_agents)
 
-        Args:
-            delta_time: Time since last update
-            targets_list: List of targets
-            should_update_neighbors: Whether to recalculate neighbors
-        """
-        birds = self.swarms["bird"]
-        alive_birds = [b for b in birds if b.alive]
+    def _update_drone_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+        """Update all drones in the air fleet."""
+        drone_list = self.swarms["drone"]
+        alive_drones = [d for d in drone_list if d.alive]
 
-        if not alive_birds:
+        if not alive_drones:
             return
 
-        # Update neighbor lists
+        # Update neighbor lists (Universal sensing for cross-swarm mesh)
         if should_update_neighbors:
-            for bird in alive_birds:
-                bird.sense_environment(alive_birds, targets_list)
+            sensing_entities = all_agents if all_agents else alive_drones
+            for drone in alive_drones:
+                drone.sense_environment(sensing_entities, targets_list)
 
-        # Update each bird
-        for bird in alive_birds:
-            neighbors = bird.neighbors if bird.neighbors else []
-            bird.update(delta_time, neighbors, bird.target, targets_list)
+        # Update each drone
+        for drone in alive_drones:
+            neighbors = drone.neighbors if drone.neighbors else []
+            drone.update(delta_time, neighbors, drone.target, targets_list)
 
             # Attack if in range
-            if bird.target and bird.target.alive:
-                dist = bird.distance_to(bird.target)
+            if drone.target and drone.target.alive:
+                dist = drone.distance_to(drone.target)
 
-                # Decide to dive or normal attack
-                if bird.can_dive() and dist < 200 and random.random() < 0.02:  # 2% chance per frame
-                    bird.initiate_dive(bird.target)
+                # Decide to kamikaze strike or normal payload
+                if drone.can_strike() and dist < 250 and random.random() < 0.02:  # 2% chance per frame
+                    drone.initiate_strike(drone.target)
 
                 # Perform attacks
-                if bird.is_diving:
-                    damage = bird.perform_dive(bird.target, delta_time)
+                if drone.is_striking:
+                    damage = drone.perform_strike(drone.target, delta_time)
                     if damage > 0:
-                        bird.target.take_damage(damage)
+                        drone.target.take_damage(damage)
                 else:
-                    damage = bird.perform_normal_attack(bird.target)
+                    damage = drone.perform_normal_attack(drone.target)
                     if damage > 0:
-                        bird.target.take_damage(damage)
+                        drone.target.take_damage(damage)
 
-        # Remove dead birds
-        self.swarms["bird"] = [b for b in self.swarms["bird"] if b.alive and b.energy > 0]
+        # Remove dead drones
+        self.swarms["drone"] = [d for d in self.swarms["drone"] if d.alive]
 
-    def _update_fish_swarm(self, delta_time, targets_list, should_update_neighbors):
-        """Update all fish in the swarm."""
-        fish_list = self.swarms["fish"]
-        alive_fish = [f for f in fish_list if f.alive]
+    def _update_pod_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+        """Update all pods in the fleet."""
+        pod_list = self.swarms["pod"]
+        alive_pods = [p for p in pod_list if p.alive]
 
-        if not alive_fish:
+        if not alive_pods:
             return
 
-        # Update neighbor lists
+        # Update neighbor lists (Universal sensing for cross-swarm mesh)
         if should_update_neighbors:
-            for fish in alive_fish:
-                fish.sense_environment(alive_fish, targets_list)
+            sensing_entities = all_agents if all_agents else alive_pods
+            for pod in alive_pods:
+                pod.sense_environment(sensing_entities, targets_list)
 
-        # Get collective vote for wave attack
-        wave_target = None
+        # Get collective vote for torpedo barrage
+        barrage_target = None
         votes = {}
-        for fish in alive_fish:
-            fish.vote_for_target(targets_list, fish.neighbors if fish.neighbors else [])
-            if fish.wave_vote:
-                votes[fish.wave_vote] = votes.get(fish.wave_vote, 0) + 1
+        for pod in alive_pods:
+            pod.vote_for_target(targets_list, pod.neighbors if pod.neighbors else [])
+            if pod.barrage_vote:
+                votes[pod.barrage_vote] = votes.get(pod.barrage_vote, 0) + 1
 
-        # Check if wave should start
-        if votes and len(alive_fish) > 0:
+        # Check if barrage should start
+        if votes and len(alive_pods) > 0:
             max_votes = max(votes.values())
-            if max_votes / len(alive_fish) >= 0.6:
-                wave_target = [t for t, v in votes.items() if v == max_votes][0]
+            if max_votes / len(alive_pods) >= 0.6:
+                barrage_target = [t for t, v in votes.items() if v == max_votes][0]
 
-        self.fish_wave_target = wave_target
-        self.fish_wave_active = wave_target is not None
+        self.pod_barrage_target = barrage_target
+        self.pod_barrage_active = barrage_target is not None
 
-        # Update each fish
-        for fish in alive_fish:
-            neighbors = fish.neighbors if fish.neighbors else []
-            fish.update(delta_time, neighbors, fish.target, targets_list, attacking=self.fish_wave_active)
+        # Update each pod
+        for pod in alive_pods:
+            neighbors = pod.neighbors if pod.neighbors else []
+            pod.update(delta_time, neighbors, pod.target, targets_list, attacking=self.pod_barrage_active)
 
             # Attack if in range
-            if fish.target and fish.target.alive:
-                damage = fish.perform_attack(fish.target)
-                if damage > 0:
-                    fish.target.take_damage(damage)
+            if pod.target and pod.target.alive:
+                damage_per_sec = pod.perform_attack(pod.target)
+                if damage_per_sec > 0:
+                    final_damage = damage_per_sec * delta_time
+                    pod.target.take_damage(final_damage)
 
-        self.swarms["fish"] = [f for f in self.swarms["fish"] if f.alive and f.energy > 0]
+        self.swarms["pod"] = [p for p in self.swarms["pod"] if p.alive]
 
-    def _update_ant_swarm(self, delta_time, targets_list, should_update_neighbors):
-        """Update all ants in the swarm."""
-        ant_list = self.swarms["ant"]
-        alive_ants = [a for a in ant_list if a.alive]
+    def _update_bot_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+        """Update all bots in the ground unit."""
+        bot_list = self.swarms["bot"]
+        alive_bots = [b for b in bot_list if b.alive]
 
-        if not alive_ants:
+        if not alive_bots:
             return
 
-        # Update neighbor lists
+        # Update neighbor lists (Universal sensing for cross-swarm mesh)
         if should_update_neighbors:
-            for ant in alive_ants:
-                ant.sense_environment(alive_ants, targets_list)
+            sensing_entities = all_agents if all_agents else alive_bots
+            for bot in alive_bots:
+                bot.sense_environment(sensing_entities, targets_list)
 
-        # Update each ant
-        for ant in alive_ants:
-            neighbors = ant.neighbors if ant.neighbors else []
-            ant.update(delta_time, ant.target, neighbors, targets_list)
+        # Update each bot
+        for bot in alive_bots:
+            neighbors = bot.neighbors if bot.neighbors else []
+            bot.update(delta_time, bot.target, neighbors, targets_list)
 
             # Attack if in range
-            if ant.target and ant.target.alive:
-                damage = ant.perform_attack(ant.target)
-                if damage > 0:
-                    ant.target.take_damage(damage)
+            if bot.target and bot.target.alive:
+                damage_per_sec = bot.perform_attack(bot.target)
+                if damage_per_sec > 0:
+                    final_damage = damage_per_sec * delta_time
+                    bot.target.take_damage(final_damage)
 
-        self.swarms["ant"] = [a for a in self.swarms["ant"] if a.alive and a.energy > 0]
+        self.swarms["bot"] = [b for b in self.swarms["bot"] if b.alive]
 
     def get_all_agents(self):
         """Get all active agents from all swarms."""
         agents = []
-        agents.extend(self.swarms["bird"])
-        agents.extend(self.swarms["fish"])
-        agents.extend(self.swarms["ant"])
+        agents.extend(self.swarms["drone"])
+        agents.extend(self.swarms["pod"])
+        agents.extend(self.swarms["bot"])
         return [a for a in agents if a.alive]
 
     def get_swarm_stats(self):
         """Get statistics about all swarms."""
         stats = {
-            "bird_count": len([a for a in self.swarms["bird"] if a.alive]),
-            "fish_count": len([a for a in self.swarms["fish"] if a.alive]),
-            "ant_count": len([a for a in self.swarms["ant"] if a.alive]),
+            "drone_count": len([a for a in self.swarms["drone"] if a.alive]),
+            "pod_count": len([a for a in self.swarms["pod"] if a.alive]),
+            "bot_count": len([a for a in self.swarms["bot"] if a.alive]),
             "total_agents": len(self.get_all_agents())
         }
         return stats
@@ -274,7 +263,7 @@ class SwarmController:
         Args:
             target: Target entity
         """
-        # Birds will naturally find targets through sensing
+        # Drones naturally find targets through sensors
         pass
 
     def remove_dead_agents(self):
@@ -282,7 +271,7 @@ class SwarmController:
         for swarm_type in self.swarms:
             self.swarms[swarm_type] = [
                 agent for agent in self.swarms[swarm_type]
-                if agent.alive and agent.energy > 0
+                if agent.alive
             ]
 
     def switch_swarm_type(self, new_type):
@@ -290,7 +279,7 @@ class SwarmController:
         Switch the active swarm type.
 
         Args:
-            new_type: New swarm type ("bird", "fish", "ant")
+            new_type: New swarm type ("drone", "pod", "bot")
         """
         if new_type in self.swarms:
             self.active_swarm_type = new_type

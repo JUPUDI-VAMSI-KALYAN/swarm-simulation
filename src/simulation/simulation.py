@@ -1,9 +1,9 @@
-"""Main simulation loop."""
+"""Main tactical simulation loop."""
 
 import pygame
 import random
 from config.settings import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BLACK, COLOR_BIRD, COLOR_TARGET,
+    SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BLACK, COLOR_DRONE, COLOR_TARGET,
     COLOR_WHITE, COLOR_GROUND, COLOR_WATER, COLOR_AIR
 )
 from src.core.vector2d import Vector2D
@@ -21,11 +21,11 @@ from src.intelligence.communication import CommunicationSystem
 
 
 class Simulation:
-    """Main simulation controller."""
+    """Main tactical simulation controller."""
 
     def __init__(self):
         """Initialize the simulation."""
-        self.renderer = Renderer("Swarm Simulation - Full v1")
+        self.renderer = Renderer("DualHQ Tactical Swarm Simulation - v2")
         self.ui_manager = UIManager()
         self.swarm_controller = SwarmController()
         self.input_handler = InputHandler()
@@ -55,7 +55,7 @@ class Simulation:
         Spawn a swarm of the specified type.
 
         Args:
-            swarm_type: Type of swarm ("bird", "fish", "ant")
+            swarm_type: Type of swarm ("drone", "pod", "bot")
             count: Number of agents
             position: Center position (Vector2D)
         """
@@ -111,22 +111,28 @@ class Simulation:
             self.current_environment = self.environments[env_type]
             self.ui_manager.set_active_button(env_type)
 
-            # Clear incompatible swarms
+            # Clear incompatible swarms and set active button
             if env_type == "air":
-                self.swarm_controller.swarms["fish"].clear()
-                self.swarm_controller.swarms["ant"].clear()
-                if not self.swarm_controller.swarms["bird"]:
-                    self.spawn_swarm("bird", 50)
+                self.swarm_controller.swarms["pod"].clear()
+                self.swarm_controller.swarms["bot"].clear()
+                self.swarm_controller.active_swarm_type = "drone"
+                self.ui_manager.set_active_button("drone")
+                if not self.swarm_controller.swarms["drone"]:
+                    self.spawn_swarm("drone", 50)
             elif env_type == "water":
-                self.swarm_controller.swarms["bird"].clear()
-                self.swarm_controller.swarms["ant"].clear()
-                if not self.swarm_controller.swarms["fish"]:
-                    self.spawn_swarm("fish", 50)
+                self.swarm_controller.swarms["drone"].clear()
+                self.swarm_controller.swarms["bot"].clear()
+                self.swarm_controller.active_swarm_type = "pod"
+                self.ui_manager.set_active_button("pod")
+                if not self.swarm_controller.swarms["pod"]:
+                    self.spawn_swarm("pod", 50)
             elif env_type == "ground":
-                self.swarm_controller.swarms["bird"].clear()
-                self.swarm_controller.swarms["fish"].clear()
-                if not self.swarm_controller.swarms["ant"]:
-                    self.spawn_swarm("ant", 50)
+                self.swarm_controller.swarms["drone"].clear()
+                self.swarm_controller.swarms["pod"].clear()
+                self.swarm_controller.active_swarm_type = "bot"
+                self.ui_manager.set_active_button("bot")
+                if not self.swarm_controller.swarms["bot"]:
+                    self.spawn_swarm("bot", 50)
 
     def _broadcast_swarm_messages(self, all_agents):
         """
@@ -142,103 +148,129 @@ class Simulation:
             if not agent.alive or agent.target is None:
                 continue
 
-            # Agent has a target - broadcast to neighbors only (O(1) per agent via pre-computed neighbor list)
+            # Agent has a target - broadcast to neighbors only
             if agent.neighbors:
-                # Create target found message with both position and reference
                 message = Message(
                     msg_type=MessageType.TARGET_FOUND,
                     sender_id=agent.id,
                     position=agent.position,
                     target_pos=agent.target.position if agent.target else None,
                     priority=max(7, agent.attack_priority),
-                    target=agent.target  # Pass actual target reference
+                    target=agent.target
                 )
-
-                # Broadcast only to neighbors within communication radius (already computed in sense_environment)
                 agent.broadcast_to_neighbors(agent.neighbors, message)
 
     def update(self, delta_time):
-        """Update simulation state."""
+        """Update tactical simulation state."""
         if self.paused:
             return
 
-        # Update environment
+        # Update environment dynamics
         self.current_environment.update(delta_time)
 
-        # Update swarms
+        # Update swarms logic
         self.swarm_controller.update_swarms(delta_time, self.targets, self.obstacles)
 
-        # Broadcast target information through swarm communication
-        # Each agent tells nearby agents about its target (neighbor-based, not O(n²))
+        # Process C2 mesh messaging
         all_agents = self.swarm_controller.get_all_agents()
         self._broadcast_swarm_messages(all_agents)
 
-        # Update targets
+        # Update targets / hostiles
         for target in self.targets:
             if target.alive:
                 target.update(delta_time)
 
-            # Track damage and destruction
             if target.is_destroyed():
                 self.targets_destroyed += 1
 
-        # Remove dead targets
         self.targets = [t for t in self.targets if t.alive]
-
-        # Clean up dead agents
         self.swarm_controller.remove_dead_agents()
 
     def render(self):
-        """Render the simulation."""
-        # Draw environment background
+        """Render the simulation HUD and units."""
         self.renderer.screen.fill(self.current_environment.color)
 
-        # Draw obstacles
         for obstacle in self.obstacles:
             self.renderer.draw_rectangle(
-                obstacle.position,
-                obstacle.width,
-                obstacle.height,
-                obstacle.color
+                obstacle.position, obstacle.width, obstacle.height, obstacle.color
             )
 
-        # Draw all targets
+        # Draw signals if on ground (bots mesh network visualizer)
+        if self.current_environment_type == "ground" and self.swarm_controller.swarms["bot"]:
+            # Optionally we could render the pheromones/signals grid here 
+            pass
+
         for target in self.targets:
             if target.alive:
                 self.renderer.draw_rectangle(
                     target.position,
-                    target.radius * 2,
-                    target.radius * 2,
-                    COLOR_TARGET
+                    target.radius * 2 + 4,
+                    target.radius * 2 + 4,
+                    COLOR_TARGET,
+                    filled=False  # outlined shape
+                )
+                self.renderer.draw_rectangle(
+                    target.position, target.radius * 1.5, target.radius * 1.5, COLOR_TARGET
                 )
 
-                # Draw health bar
                 health_bar_width = 40
                 health_bar_height = 5
-                bar_pos = Vector2D(target.position.x, target.position.y - target.radius - 10)
+                bar_pos = Vector2D(target.position.x, target.position.y - target.radius - 12)
                 self.renderer.draw_health_bar(
                     bar_pos, health_bar_width, health_bar_height,
                     target.health, target.max_health
                 )
 
-        # Draw all agents
+        # Render explicit agent shapes
         agents = self.swarm_controller.get_all_agents()
         for agent in agents:
-            if agent.alive:
+            if not agent.alive:
+                continue
+
+            if agent.swarm_type == "drone":
+                # Triangles for drones
+                dir_vec = agent.velocity.normalize()
+                if dir_vec.magnitude() == 0:
+                    dir_vec = Vector2D(0, -1)
+                p1 = agent.position + dir_vec * agent.radius * 2
+                p2 = agent.position - dir_vec * agent.radius + Vector2D(-dir_vec.y, dir_vec.x) * agent.radius * 1.5
+                p3 = agent.position - dir_vec * agent.radius - Vector2D(-dir_vec.y, dir_vec.x) * agent.radius * 1.5
+                self.renderer.draw_polygon([p1.to_tuple(), p2.to_tuple(), p3.to_tuple()], agent.color)
+
+            elif agent.swarm_type == "pod":
+                # Torpedo shapes (pills) or elongated rects for pods
+                dir_vec = agent.velocity.normalize()
+                if dir_vec.magnitude() == 0:
+                    dir_vec = Vector2D(1, 0)
+                length = agent.radius * 3
+                thick = agent.radius * 1.2
+                # Center is agent.position
+                p1 = agent.position + dir_vec * (length/2)
+                p2 = agent.position - dir_vec * (length/2)
+                self.renderer.draw_line(p1, p2, agent.color, width=int(thick))
+                # Add a lighter front tip
+                self.renderer.draw_circle(p1, thick/2, COLOR_WHITE)
+
+            elif agent.swarm_type == "bot":
+                # Square chassis for ground bots
+                self.renderer.draw_rectangle(agent.position, agent.radius * 2.5, agent.radius * 2.5, agent.color)
+                # Maybe add a small dot indicating forward
+                dir_vec = agent.velocity.normalize()
+                if dir_vec.magnitude() > 0:
+                    fwd_pt = agent.position + dir_vec * agent.radius * 1.5
+                    self.renderer.draw_circle(fwd_pt, 2, COLOR_WHITE)
+
+            else:
                 self.renderer.draw_circle(agent.position, agent.radius, agent.color)
 
-        # Draw UI
         self.ui_manager.update(Vector2D(*pygame.mouse.get_pos()))
         self.ui_manager.draw(self.renderer)
 
-        # Draw stats
         stats = self.swarm_controller.get_swarm_stats()
         stats["targets_alive"] = len([t for t in self.targets if t.alive])
         stats["targets_destroyed"] = self.targets_destroyed
         self.ui_manager.draw_stats(self.renderer, stats)
         self.ui_manager.draw_help(self.renderer)
-
-        # Draw FPS
         self.renderer.display_fps()
 
         self.renderer.flip()
@@ -272,26 +304,20 @@ class Simulation:
 
                 # Swarm cycling
                 if button_name == "swarm_cycle_next":
-                    swarm_types = ["bird", "fish", "ant"]
+                    swarm_types = ["drone", "pod", "bot"]
                     current = self.swarm_controller.active_swarm_type
                     next_idx = (swarm_types.index(current) + 1) % len(swarm_types)
                     next_swarm = swarm_types[next_idx]
-                    if not self.swarm_controller.swarms[next_swarm]:
-                        self.spawn_swarm(next_swarm, 50)
-                    else:
-                        self.swarm_controller.active_swarm_type = next_swarm
-                    self.ui_manager.set_active_button(next_swarm)
+                    env_map = {"drone": "air", "pod": "water", "bot": "ground"}
+                    self.switch_environment(env_map[next_swarm])
 
                 elif button_name == "swarm_cycle_prev":
-                    swarm_types = ["bird", "fish", "ant"]
+                    swarm_types = ["drone", "pod", "bot"]
                     current = self.swarm_controller.active_swarm_type
                     prev_idx = (swarm_types.index(current) - 1) % len(swarm_types)
                     prev_swarm = swarm_types[prev_idx]
-                    if not self.swarm_controller.swarms[prev_swarm]:
-                        self.spawn_swarm(prev_swarm, 50)
-                    else:
-                        self.swarm_controller.active_swarm_type = prev_swarm
-                    self.ui_manager.set_active_button(prev_swarm)
+                    env_map = {"drone": "air", "pod": "water", "bot": "ground"}
+                    self.switch_environment(env_map[prev_swarm])
 
                 # Environment cycling
                 elif button_name == "env_cycle_next":
@@ -307,7 +333,7 @@ class Simulation:
                     self.switch_environment(envs[prev_idx])
 
                 # Direct swarm type buttons (fallback)
-                elif button_name in ["bird", "fish", "ant"]:
+                elif button_name in ["drone", "pod", "bot"]:
                     swarm_type = button_name
                     if not self.swarm_controller.swarms[swarm_type]:
                         self.spawn_swarm(swarm_type, 50)
@@ -338,8 +364,8 @@ class Simulation:
         """Main simulation loop."""
         self.running = True
 
-        # Spawn initial flock
-        self.spawn_swarm("bird", 50)
+        # Spawn initial drone swarm
+        self.spawn_swarm("drone", 50)
 
         while self.running:
             delta_time = self.renderer.tick()

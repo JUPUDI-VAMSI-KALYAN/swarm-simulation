@@ -162,10 +162,10 @@ class SwarmAgent(Entity):
                     else:
                         # Search for target at position
                         for t in targets_list:
-                            if t.alive and t.position.distance(message.target_pos) < 10:
+                            # Allow a much larger tolerance (50px) for position matching via mesh
+                            if t.alive and t.position.distance(message.target_pos) < 50:
                                 self.target = t
                                 break
-
                     # If we got target, become aggressive and set timeout
                     if self.target is not None:
                         self.aggressive = True
@@ -217,7 +217,9 @@ class SwarmAgent(Entity):
 
         # Energy decays based on speed
         speed = self.velocity.magnitude()
-        energy_drain = speed * delta_time * 5
+        # Normalize speed relative to max_speed (0 to 1) so scaling up physics doesn't instantly drain energy
+        normalized_speed = speed / max(1.0, float(getattr(self, 'max_speed', 150.0)))
+        energy_drain = normalized_speed * delta_time * 5.0
 
         # Additional drain during attacks
         if self.state == "attacking":

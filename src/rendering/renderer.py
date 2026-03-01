@@ -16,8 +16,15 @@ class Renderer:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption(title)
         self.clock = pygame.time.Clock()
-        self.font_small = pygame.font.Font(None, 24)
-        self.font_large = pygame.font.Font(None, 36)
+        # Tactical HUD fonts
+        try:
+            self.font_small = pygame.font.SysFont("courier,consolas,monospace", 14)
+            self.font_medium = pygame.font.SysFont("courier,consolas,monospace", 18, bold=True)
+            self.font_large = pygame.font.SysFont("courier,consolas,monospace", 28, bold=True)
+        except:
+            self.font_small = pygame.font.Font(None, 18)
+            self.font_medium = pygame.font.Font(None, 24)
+            self.font_large = pygame.font.Font(None, 36)
 
     def clear(self):
         """Clear screen with background color."""
@@ -31,14 +38,14 @@ class Renderer:
         else:
             pygame.draw.circle(self.screen, color, (x, y), int(radius), 2)
 
-    def draw_rectangle(self, position, width, height, color, filled=True):
+    def draw_rectangle(self, position, width, height, color, filled=True, border_radius=0):
         """Draw a rectangle."""
         x, y = int(position.x), int(position.y)
         rect = pygame.Rect(x - width // 2, y - height // 2, width, height)
         if filled:
-            pygame.draw.rect(self.screen, color, rect)
+            pygame.draw.rect(self.screen, color, rect, border_radius=border_radius)
         else:
-            pygame.draw.rect(self.screen, color, rect, 2)
+            pygame.draw.rect(self.screen, color, rect, 2, border_radius=border_radius)
 
     def draw_line(self, start_pos, end_pos, color, width=1):
         """Draw a line."""
@@ -56,7 +63,13 @@ class Renderer:
 
     def draw_text(self, text, position, color=COLOR_BLACK, size="small"):
         """Draw text on screen."""
-        font = self.font_small if size == "small" else self.font_large
+        if size == "small":
+            font = self.font_small
+        elif size == "medium":
+            font = self.font_medium
+        else:
+            font = self.font_large
+            
         text_surface = font.render(text, True, color)
         self.screen.blit(text_surface, (int(position[0]), int(position[1])))
 

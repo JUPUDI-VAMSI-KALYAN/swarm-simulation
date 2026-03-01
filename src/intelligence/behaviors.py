@@ -8,7 +8,7 @@ class SteeringBehaviors:
     """Collection of steering behavior functions."""
 
     @staticmethod
-    def seek(position, target_position, max_speed=5.0):
+    def seek(position, target_position, max_speed=300.0):
         """
         Seek behavior - steer toward target.
 
@@ -32,7 +32,7 @@ class SteeringBehaviors:
         return desired
 
     @staticmethod
-    def flee(position, threat_position, max_speed=5.0):
+    def flee(position, threat_position, max_speed=300.0):
         """
         Flee behavior - steer away from threat.
 
@@ -56,7 +56,7 @@ class SteeringBehaviors:
         return desired
 
     @staticmethod
-    def arrive(position, velocity, target_position, slow_radius=100, max_speed=5.0):
+    def arrive(position, velocity, target_position, slow_radius=100, max_speed=300.0):
         """
         Arrive behavior - steer toward target and slow down nearby.
 
@@ -218,39 +218,118 @@ class SteeringBehaviors:
         return steer
 
     @staticmethod
-    def wander(velocity, wander_angle, wander_radius=20, max_force=1.0):
+    def grid_alignment(velocity, neighbors, perception_radius=80, max_force=1.0):
         """
-        Wander behavior - explore space with random direction changes.
-
+        Grid Alignment - Steer agents so they all perfectly align to a specific tactical heading
+        (e.g., straight up, down, left, right relative to swarm center).
+        
         Args:
             velocity: Current velocity (Vector2D)
-            wander_angle: Current wander angle (radians) - update this value
-            wander_radius: Radius of wander circle
+            neighbors: List of neighbor entities
+            perception_radius: Distance to consider neighbors
             max_force: Maximum force magnitude
 
         Returns:
-            Tuple of (steering_force, new_wander_angle)
+            Steering force (Vector2D)
         """
-        import random
+        import math
+        steering = Vector2D(0, 0)
+        count = 0
 
-        # Update wander angle randomly
-        change = random.uniform(-math.pi / 8, math.pi / 8)
-        wander_angle += change
+        for neighbor, distance in neighbors:
+            if distance < perception_radius:
+                steering = steering + neighbor.velocity
+                count += 1
 
-        # Calculate wander circle position
+        if count > 0:
+            steering = steering / count
+            
+            # Snap steering to standard block angles (0, 90, 180, 270)
+            if steering.magnitude() > 0:
+                angle = math.atan2(steering.y, steering.x)
+                # Round to nearest 90 degrees (pi/2 radians)
+                snapped_angle = round(angle / (math.pi/2)) * (math.pi/2)
+                
+                rigid_dir = Vector2D(math.cos(snapped_angle), math.sin(snapped_angle))
+                steering = rigid_dir * velocity.magnitude() - velocity
+                
+        if steering.magnitude() > 0:
+            steering = steering.normalize() * max_force
+
+        return steering
+
+    @staticmethod
+    def sonar_sweep(position, velocity, sweep_angle, sweep_radius=40, max_force=1.0):
+        """
+        Sonar Sweep - Methodical searching pattern (like a scanning arc).
+        
+        Args:
+            position: Current position (Vector2D)
+            velocity: Current velocity (Vector2D)
+            sweep_angle: Current sweeping angle in radians (must be updated externally)
+            sweep_radius: Radius of sweep circle
+            max_force: Max steering force
+            
+        Returns:
+            Tuple of (steering_force, new_sweep_angle)
+        """
+        import math
+        
+        # Methodical sweep (oscillating between -45 and 45 degrees)
+        # Assuming sweep_angle increases constantly
+        sweep_angle += 0.05
+        
+        # Calculate offset using sine to sweep back and forth
+        offset = math.sin(sweep_angle) * (math.pi / 4) # 45 degree arc
+        
         if velocity.magnitude() > 0:
-            direction = velocity.normalize()
-            wander_center = direction * wander_radius
+            current_heading = math.atan2(velocity.y, velocity.x)
+            target_angle = current_heading + offset
         else:
-            wander_center = Vector2D(wander_radius, 0)
+            target_angle = offset
+            
+        target_dir = Vector2D(math.cos(target_angle), math.sin(target_angle))
+        
+        steering = target_dir * max_force
+        
+        return steering, sweep_angle
 
-        # Add point on wander circle
-        wander_pos = Vector2D(
-            wander_center.x + math.cos(wander_angle) * wander_radius,
-            wander_center.y + math.sin(wander_angle) * wander_radius
-        )
-
-        # Steer toward wander position
-        steering = wander_pos.normalize() * max_force
-
-        return steering, wander_angle
+    @staticmethod
+    def precision_patrol(velocity, patrol_timer, patrol_state, max_force=1.0):
+        """
+        Precision Patrol - Terrestrial bots move in perfect straight lines, 
+        stop, rotate 90 degrees, and continue driving the grid.
+        
+        Args:
+            velocity: Current velocity (Vector2D)
+            patrol_timer: Time spent on current leg
+            patrol_state: Direction state (0, 1, 2, 3) mapped to NSEW
+            max_force: Maximum steering force
+            
+        Returns:
+            Tuple (steering, new_timer, new_state)
+        """
+        import math
+        
+        patrol_timer -= 1
+        
+        if patrol_timer <= 0:
+            # Time to turn 90 degrees (switch state)
+            patrol_state = (patrol_state + 1) % 4
+            patrol_timer = 60 # wait 60 frames on new leg
+            
+        # Direction mapping (0: E, 1: S, 2: W, 3: N)
+        angles = [0, math.pi/2, math.pi, -math.pi/2]
+        target_angle = angles[patrol_state]
+        
+        target_dir = Vector2D(math.cos(target_angle), math.sin(target_angle))
+        
+        if velocity.magnitude() == 0:
+            steering = target_dir * max_force
+        else:
+            steering = (target_dir * velocity.magnitude()) - velocity
+            
+        if steering.magnitude() > 0:
+            steering = steering.normalize() * max_force
+            
+        return steering, patrol_timer, patrol_state
