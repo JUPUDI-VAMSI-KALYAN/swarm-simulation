@@ -104,9 +104,15 @@ class SwarmController:
 
         return spawned
 
-    def update_swarms(self, delta_time, targets, obstacles):
+    def update_swarms(self, delta_time, targets, obstacles, spatial_hash=None):
         """
         Main update loop for all swarms.
+
+        Args:
+            delta_time: Time since last update
+            targets: List of targets
+            obstacles: List of obstacles
+            spatial_hash: SpatialHashGrid for efficient neighbor queries
         """
         # Update signal network map
         self.signal_map.update()
@@ -121,11 +127,11 @@ class SwarmController:
         all_agents = self.get_all_agents()
 
         # Update each sub-swarm
-        self._update_drone_swarm(delta_time, targets, should_update_neighbors, all_agents)
-        self._update_pod_swarm(delta_time, targets, should_update_neighbors, all_agents)
-        self._update_bot_swarm(delta_time, targets, should_update_neighbors, all_agents)
+        self._update_drone_swarm(delta_time, targets, should_update_neighbors, all_agents, spatial_hash)
+        self._update_pod_swarm(delta_time, targets, should_update_neighbors, all_agents, spatial_hash)
+        self._update_bot_swarm(delta_time, targets, should_update_neighbors, all_agents, spatial_hash)
 
-    def _update_drone_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+    def _update_drone_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None, spatial_hash=None):
         """Update all drones in the air fleet."""
         drone_list = self.swarms["drone"]
         alive_drones = [d for d in drone_list if d.alive]
@@ -137,7 +143,7 @@ class SwarmController:
         if should_update_neighbors:
             sensing_entities = all_agents if all_agents else alive_drones
             for drone in alive_drones:
-                drone.sense_environment(sensing_entities, targets_list)
+                drone.sense_environment(sensing_entities, targets_list, spatial_hash)
 
         # Update each drone
         for drone in alive_drones:
@@ -165,7 +171,7 @@ class SwarmController:
         # Remove dead drones
         self.swarms["drone"] = [d for d in self.swarms["drone"] if d.alive]
 
-    def _update_pod_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+    def _update_pod_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None, spatial_hash=None):
         """Update all pods in the fleet."""
         pod_list = self.swarms["pod"]
         alive_pods = [p for p in pod_list if p.alive]
@@ -177,7 +183,7 @@ class SwarmController:
         if should_update_neighbors:
             sensing_entities = all_agents if all_agents else alive_pods
             for pod in alive_pods:
-                pod.sense_environment(sensing_entities, targets_list)
+                pod.sense_environment(sensing_entities, targets_list, spatial_hash)
 
         # Get collective vote for torpedo barrage
         barrage_target = None
@@ -210,7 +216,7 @@ class SwarmController:
 
         self.swarms["pod"] = [p for p in self.swarms["pod"] if p.alive]
 
-    def _update_bot_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None):
+    def _update_bot_swarm(self, delta_time, targets_list, should_update_neighbors, all_agents=None, spatial_hash=None):
         """Update all bots in the ground unit."""
         bot_list = self.swarms["bot"]
         alive_bots = [b for b in bot_list if b.alive]
@@ -222,7 +228,7 @@ class SwarmController:
         if should_update_neighbors:
             sensing_entities = all_agents if all_agents else alive_bots
             for bot in alive_bots:
-                bot.sense_environment(sensing_entities, targets_list)
+                bot.sense_environment(sensing_entities, targets_list, spatial_hash)
 
         # Update each bot
         for bot in alive_bots:

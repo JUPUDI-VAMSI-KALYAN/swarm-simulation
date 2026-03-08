@@ -6,7 +6,7 @@ from typing import Any, Optional
 from src.swarm.swarm_agent import SwarmAgent
 from src.intelligence.behaviors import SteeringBehaviors
 from src.core.vector2d import Vector2D
-from config.settings import COLOR_BOT, SwarmConfig
+from config.settings import COLOR_BOT, SwarmConfig, SCREEN_WIDTH, SCREEN_HEIGHT
 
 
 class Bot(SwarmAgent):
@@ -173,7 +173,6 @@ class Bot(SwarmAgent):
         super().update(delta_time)
 
         # Wrap edges
-        from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
         self.wrap_edges(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # Update energy

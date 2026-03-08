@@ -4,9 +4,11 @@ import pygame
 import random
 from config.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BLACK, COLOR_DRONE, COLOR_TARGET,
-    COLOR_WHITE, COLOR_GROUND, COLOR_WATER, COLOR_AIR, SwarmConfig
+    COLOR_WHITE, COLOR_GROUND, COLOR_WATER, COLOR_AIR, SwarmConfig,
+    SPATIAL_HASH_CELL_SIZE
 )
 from src.core.vector2d import Vector2D
+from src.core.spatial_hash import SpatialHashGrid
 from src.rendering.renderer import Renderer
 from src.rendering.ui import UIManager
 from src.swarm.swarm_controller import SwarmController
@@ -39,6 +41,13 @@ class Simulation:
         self.total_damage_dealt = 0
         self.targets_destroyed = 0
 
+        # Spatial hash grid for O(1) neighbor queries
+        self.spatial_hash = SpatialHashGrid(
+            cell_size=SPATIAL_HASH_CELL_SIZE,
+            grid_width=SCREEN_WIDTH,
+            grid_height=SCREEN_HEIGHT
+        )
+
         # Communication system
         self.communication = CommunicationSystem()
 
@@ -54,7 +63,7 @@ class Simulation:
         # Geographic maps (OpenStreetMap)
         self.map_manager = OSMMapManager(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.show_map = True
-        self.map_type = "india"  # "india" or "indian_ocean"
+        self.map_type = "india"
 
     def spawn_swarm(self, swarm_type, count=50, position=None):
         """
@@ -179,11 +188,17 @@ class Simulation:
         if self.paused:
             return
 
+        # Rebuild spatial hash for efficient neighbor queries
+        all_agents = self.swarm_controller.get_all_agents()
+        self.spatial_hash.rebuild(all_agents)
+
         # Update environment dynamics
         self.current_environment.update(delta_time)
 
-        # Update swarms logic
-        self.swarm_controller.update_swarms(delta_time, self.targets, self.obstacles)
+        # Update swarms logic with spatial hash
+        self.swarm_controller.update_swarms(
+            delta_time, self.targets, self.obstacles, self.spatial_hash
+        )
 
         # Process C2 mesh messaging
         all_agents = self.swarm_controller.get_all_agents()

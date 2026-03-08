@@ -1,14 +1,15 @@
 """Drone swarm implementation with tactical formation and strike behaviors."""
 
 import logging
-import math
 import random
 from typing import Any, Optional
+
+import math
 
 from src.swarm.swarm_agent import SwarmAgent
 from src.intelligence.tactical_formation import TacticalFormationBehavior
 from src.core.vector2d import Vector2D
-from config.settings import COLOR_DRONE, SwarmConfig
+from config.settings import COLOR_DRONE, SwarmConfig, SCREEN_WIDTH, SCREEN_HEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -206,10 +207,9 @@ class Drone(SwarmAgent):
             self.velocity = Vector2D(0, 0)
         # Prevent physics explosion on self.position
         if math.isnan(self.position.x) or math.isnan(self.position.y):
-            self.position = Vector2D(100, 100) # Reset on screen
+            self.position = Vector2D(100, 100)
 
         # Wrap around screen edges
-        from config.settings import SCREEN_WIDTH, SCREEN_HEIGHT
         self.wrap_edges(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # Update energy and manage state timeouts

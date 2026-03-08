@@ -51,29 +51,35 @@ class SwarmAgent(Entity):
     def sense_environment(
         self,
         all_entities: list[Any],
-        targets_list: list[Any]
+        targets_list: list[Any],
+        spatial_hash: Any = None
     ) -> None:
         """
-        Detect nearby entities (neighbors) and targets.
+        Detect nearby entities (neighbors) and targets using spatial hashing.
 
         Args:
             all_entities: List of all entities in simulation
             targets_list: List of targets to detect
+            spatial_hash: Optional SpatialHashGrid for O(1) neighbor lookup
         """
-        if not all_entities:
-            return
-        # Clear old neighbors and find new ones
         self.neighbors = []
-        for entity in all_entities:
-            if entity is not self and entity.alive:
-                dist = self.distance_to(entity)
-                if dist < self.perception_radius and dist > 0:
-                    self.neighbors.append((entity, dist))
 
-        # Sort neighbors by distance for easier processing
+        if spatial_hash is not None:
+            nearby = spatial_hash.get_neighbors(self, self.perception_radius)
+            for entity, dist in nearby:
+                if entity is not self and entity.alive:
+                    self.neighbors.append((entity, dist))
+        else:
+            if not all_entities:
+                return
+            for entity in all_entities:
+                if entity is not self and entity.alive:
+                    dist = self.distance_to(entity)
+                    if dist < self.perception_radius and dist > 0:
+                        self.neighbors.append((entity, dist))
+
         self.neighbors.sort(key=lambda x: x[1])
 
-        # Detect nearby targets
         if self.target is None or not self.target.alive:
             self.target = self._select_target(targets_list)
 
@@ -134,8 +140,6 @@ class SwarmAgent(Entity):
         Args:
             message: Message dict with type and data
         """
-        if self.messages is None:
-            self.messages = []
         self.messages.append(message)
 
     def receive_message(self, message):
@@ -145,8 +149,6 @@ class SwarmAgent(Entity):
         Args:
             message: Message object or dict
         """
-        if self.messages is None:
-            self.messages = []
         self.messages.append(message)
 
     def process_messages(self, targets_list=None):
@@ -160,43 +162,40 @@ class SwarmAgent(Entity):
         if not self.messages:
             return
 
-        for message in self.messages[:]:  # Copy list to avoid modification during iteration
-            # Handle TARGET_FOUND messages
+        processed = []
+        for message in self.messages:
+            if message in processed:
+                continue
+            processed.append(message)
+
+            msg_type_str = ''
             if hasattr(message, 'msg_type'):
                 msg_type_str = message.msg_type.value if hasattr(message.msg_type, 'value') else str(message.msg_type)
             else:
                 msg_type_str = message.get('type', '')
 
-            # Message types: target_found, target_location, under_attack, target_destroyed, attack_now
             if 'target' in msg_type_str.lower() or 'location' in msg_type_str.lower():
-                # Adopt the target from the message
                 if hasattr(message, 'target_pos') and targets_list:
                     self.target_position = message.target_pos
-                    # Find actual target by position (may be sent as reference in Message)
                     if hasattr(message, 'target') and message.target:
                         self.target = message.target
                     else:
-                        # Search for target at position
                         for t in targets_list:
-                            # Allow a much larger tolerance (50px) for position matching via mesh
-                            if t.alive and t.position.distance(message.target_pos) < 50:
+                            if t.alive and t.position.distance(message.target_pos) < SwarmConfig.TARGET_POSITION_TOLERANCE:
                                 self.target = t
                                 break
-                    # If we got target, become aggressive and set timeout
                     if self.target is not None:
                         self.aggressive = True
-                        self.aggressive_timeout = 25  # Stay aggressive for 25 seconds
+                        self.aggressive_timeout = SwarmConfig.DEFAULT_AGGRESSIVE_TIMEOUT
                         self.attack_priority = 8
-                        self.state = "attacking"  # Go straight to attacking to broadcast message
+                        self.state = "attacking"
 
-            # Handle ATTACK_NOW messages - increase aggression
             elif 'attack' in msg_type_str.lower():
                 self.aggressive = True
                 self.attack_priority = max(self.attack_priority, 9)
                 self.state = "attacking"
 
-            # Remove processed message
-            self.messages.remove(message)
+        self.messages.clear()
 
     def broadcast_to_neighbors(self, neighbors_list, message):
         """

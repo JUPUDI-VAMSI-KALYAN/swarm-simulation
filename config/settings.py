@@ -15,10 +15,10 @@ PIXEL_SCALE = 1.0
 
 # Performance
 MAX_ENTITIES = 1000
-SPATIAL_HASH_CELL_SIZE = 50
+SPATIAL_HASH_CELL_SIZE = 100  # 100m cells for realistic scale
 UPDATE_NEIGHBORS_EVERY_N_FRAMES = 5
 TARGET_FPS = 60
-NEIGHBOR_UPDATE_INTERVAL = 0.1  # 10Hz sensing updates
+NEIGHBOR_UPDATE_INTERVAL = 0.2  # 5Hz sensing updates (realistic for most sensors)
 
 # Colors
 COLOR_BACKGROUND = (15, 20, 25)  # Dark Tactical HUD Background
@@ -49,55 +49,64 @@ class SwarmConfig:
     """Configuration constants for swarm agents."""
 
     # Base swarm agent defaults
-    DEFAULT_PERCEPTION_RADIUS = 80.0
-    DEFAULT_COMMUNICATION_RADIUS = 120.0
+    DEFAULT_PERCEPTION_RADIUS = 100.0
+    DEFAULT_COMMUNICATION_RADIUS = 150.0
     DEFAULT_MAX_ENERGY = 100.0
     DEFAULT_MESSAGE_COOLDOWN = 0.1
-    DEFAULT_AGGRESSIVE_TIMEOUT = 25.0
+    DEFAULT_AGGRESSIVE_TIMEOUT = 30.0
 
-    # Drone (Air) configuration
-    DRONE_MAX_SPEED = 350.0
-    DRONE_MAX_FORCE = 180.0
-    DRONE_PERCEPTION_RADIUS = 450.0
-    DRONE_COMMUNICATION_RADIUS = 600.0
-    DRONE_RADIUS = 6.0
-    DRONE_STRIKE_COOLDOWN = 5.0
-    DRONE_MAX_STRIKE_DAMAGE = 4.0
-    DRONE_NORMAL_ATTACK_DAMAGE = 1.0
+    # Drone (Air) configuration - Realistic quadcopter parameters
+    # Max speed ~25 m/s (90 km/h), typical reconnaissance drone
+    DRONE_MAX_SPEED = 90.0
+    DRONE_MAX_FORCE = 45.0
+    # Lidar/sensor range ~200m in good conditions
+    DRONE_PERCEPTION_RADIUS = 200.0
+    # Mesh network communication range ~300m
+    DRONE_COMMUNICATION_RADIUS = 300.0
+    DRONE_RADIUS = 0.3  # ~30cm wingspan
+    DRONE_STRIKE_COOLDOWN = 10.0  # 10 seconds between strikes
+    DRONE_MAX_STRIKE_DAMAGE = 5.0  # Light explosive payload
+    DRONE_NORMAL_ATTACK_DAMAGE = 0.5  # Small arms / sensor jamming
     DRONE_ATTACK_RANGE = 15.0
-    DRONE_STRIKE_RANGE = 250.0
+    DRONE_STRIKE_RANGE = 50.0  # Must get close for strike
     DRONE_AGGRESSIVE_DAMAGE_BOOST = 1.3
     DRONE_STRIKE_DAMAGE_BOOST = 1.5
     DRONE_ALTITUDE = 100.0
 
-    # Pod (Water) configuration
-    POD_MAX_SPEED = 180.0
-    POD_MAX_FORCE = 100.0
-    POD_PERCEPTION_RADIUS = 350.0
-    POD_COMMUNICATION_RADIUS = 500.0
-    POD_RADIUS = 5.0
-    POD_NORMAL_ATTACK_DAMAGE = 25.0
-    POD_BARRAGE_ATTACK_DAMAGE = 80.0
-    POD_ATTACK_RANGE = 250.0
+    # Pod (Water) configuration - Realistic UUV (Unmanned Underwater Vehicle)
+    # Typical UUV speed ~2-4 knots (1-2 m/s), some can do 6 knots
+    POD_MAX_SPEED = 3.0
+    POD_MAX_FORCE = 1.5
+    # Underwater sonar range ~500m in good conditions
+    POD_PERCEPTION_RADIUS = 150.0
+    # Acoustic modem range ~1km
+    POD_COMMUNICATION_RADIUS = 200.0
+    POD_RADIUS = 0.2  # ~20cm diameter
+    POD_NORMAL_ATTACK_DAMAGE = 1.0  # Light torpedo
+    POD_BARRAGE_ATTACK_DAMAGE = 3.0  # Full torpedo
+    POD_ATTACK_RANGE = 30.0
     POD_BARRAGE_VOTE_THRESHOLD = 0.6  # 60% majority
 
-    # Bot (Ground) configuration
-    BOT_MAX_SPEED = 150.0
-    BOT_MAX_FORCE = 80.0
-    BOT_PERCEPTION_RADIUS = 250.0
-    BOT_COMMUNICATION_RADIUS = 400.0
-    BOT_RADIUS = 4.0
-    BOT_ATTACK_RANGE = 150.0
-    BOT_NORMAL_ATTACK_DAMAGE = 15.0
-    BOT_RANDOM_WALK_STRENGTH = 0.4
+    # Bot (Ground) configuration - Realistic UGV (Unmanned Ground Vehicle)
+    # Typical patrol speed ~1-2 m/s
+    BOT_MAX_SPEED = 2.0
+    BOT_MAX_FORCE = 1.0
+    # Ground robot sensor range ~50-100m
+    BOT_PERCEPTION_RADIUS = 80.0
+    # Ground mesh network ~100m
+    BOT_COMMUNICATION_RADIUS = 100.0
+    BOT_RADIUS = 0.3  # ~60cm footprint
+    BOT_ATTACK_RANGE = 20.0
+    BOT_NORMAL_ATTACK_DAMAGE = 0.8
+    BOT_RANDOM_WALK_STRENGTH = 0.3
 
-    # Energy management
-    ENERGY_DRAIN_MULTIPLIER = 5.0
-    ENERGY_ATTACK_DRAIN_MULTIPLIER = 2.0
-    ENERGY_RECOVERY_RATE = 10.0
+    # Energy management - Realistic battery life
+    ENERGY_DRAIN_MULTIPLIER = 2.0  # Lower drain rate
+    ENERGY_ATTACK_DRAIN_MULTIPLIER = 1.5
+    ENERGY_RECOVERY_RATE = 5.0  # Solar/charging
 
     # Target detection
-    TARGET_POSITION_TOLERANCE = 50.0
+    TARGET_POSITION_TOLERANCE = 20.0
 
 
 # Target configuration
